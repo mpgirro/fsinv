@@ -1,5 +1,8 @@
 #!/usr/bin/env ruby
 
+require 'mime/types'
+require 'filemagic'
+
 # use this if you see a KB as 2^10 bits
 #$BYTES_IN_KiB = 2**10
 #$BYTES_IN_MiB = 2**20
@@ -11,6 +14,8 @@ $BYTES_IN_KB = 10**3
 $BYTES_IN_MB = 10**6
 $BYTES_IN_GB = 10**9
 $BYTES_IN_TB = 10**12
+
+$fm = FileMagic.new # we will need this quite a lot
 
 def sanitize_string(string)
   string = string.encode("UTF-16BE", :invalid=>:replace, :replace=>"_").encode("UTF-8")
@@ -34,7 +39,7 @@ def get_size_string(size_in_bytes)
 end
 
 class FileDefinition
-  attr_accessor :size_in_bytes,:path
+  attr_accessor :size_in_bytes,:path,:mime_type,:description
   def initialize(path, size_in_bytes = nil)
     @path = path
     if size_in_bytes.nil?
@@ -48,12 +53,23 @@ class FileDefinition
     else
       @size_in_bytes = size_in_bytes
     end
+    
+    #@mime_type = `file -b --mime #{path}`
+    @mime_type = MIME::Types.type_for(path)
+    
+    @description = $fm.file(@path)
   end
     
   def to_json()
     begin 
       p = sanitize_string(@path)
-      return "\{ \"type\" : \"file\", \"path\" : \"#{p}\", \"size_in_bytes\": \"#{@size_in_bytes}\" \}"
+      return "\{  
+                  \"type\" : \"file\", 
+                  \"path\" : \"#{p}\", 
+                  \"size_in_bytes\" : \"#{@size_in_bytes}\", 
+                  \"mime_type\" : \"#{@mime_type.join(', ')}\",
+                  \"description\" : \"#{@description}\"
+              \}"
     rescue ArgumentError
       puts "Invalid symbol in path: #{@path}"
       return ""
@@ -68,17 +84,26 @@ class DirectoryDefinition
   end
   
   def to_json()
-    files = "["
+    #files = "["
+    files = []
     @file_list.each {|f|
-      unless files.empty?
-        files += ", "
-      end
-      files = files + f.to_json()
+      #unless files.empty?
+      #  files += ", "
+      #end
+      #files = files + f.to_json()
+      files << f.to_json()
     }
-    files += "]"
+    #files += "]"
     begin 
       p = sanitize_string(@path)
-      return "\{ \"type\" : \"directory\", \"path\" : \"#{p}\", \"size_in_bytes\": \"#{@size_in_bytes}\", \"files\" : #{files} \}"
+      return "\{ 
+                \"type\" : \"directory\", 
+                \"path\" : \"#{p}\", 
+                \"size_in_bytes\" : \"#{@size_in_bytes}\", 
+                \"files\" : [
+                  #{files.join(",")}
+                ]
+              \}"
     rescue ArgumentError
       puts "Invalid symbol in path: #{@path}"
       return "" # do not return invalid dirs
