@@ -17,6 +17,7 @@ $BYTES_IN_GB = 10**9
 $BYTES_IN_TB = 10**12
 
 $fm = FileMagic.new # we will need this quite a lot
+$broken_paths = []
 
 def sanitize_string(string)
   string = string.encode("UTF-16BE", :invalid=>:replace, :replace=>"_").encode("UTF-8")
@@ -72,6 +73,7 @@ class FileDefinition
       return "\{ \"type\" : \"file\", \"path\" : \"#{p}\", \"bytes\" : \"#{@bytes}\", \"mime_type\" : \"#{@mime_type.join(', ')}\", \"type_description\" : \"#{@type_description}\" \}"
     rescue ArgumentError
       puts "Invalid symbol in path: #{@path}"
+      $broken_paths << @path
       return ""
     end
   end
@@ -99,6 +101,7 @@ class DirectoryDefinition
       return "\{ \"type\" : \"directory\", \"path\" : \"#{p}\", \"bytes\" : \"#{@bytes}\", \"files\" : [ #{files.join(", ")} ] \}"
     rescue ArgumentError
       puts "Invalid symbol in path: #{@path}"
+      $broken_paths << @path
       return "" # do not return invalid dirs
     end
   end
@@ -143,15 +146,16 @@ puts("path: #{main_dir.path}")
 puts("size: #{get_size_string(size)} (#{size} Bytes)")
 puts("files: #{main_dir.file_list.length}")
 
-#main_dir.file_list.each { |file|
-#  puts("\t#{file.path} (#{file.get_size_string()})")
-#}
-
-#puts("json:")
-puts("writing json to ./file_structure.json")
+puts "writing JSON to ./file_structure.json" 
 File.open("file_structure.json", 'w') {|f| 
   #json_str = main_dir.to_json()
   json_str = JSON.pretty_generate(JSON.parse(main_dir.to_json()))
   f.write(json_str) 
 }
-#puts(main_dir.to_json())
+
+if $broken_paths.length > 0
+  puts "writing broken links to ./broken_links.txt"
+  File.open("broken_links.txt", 'w') {|f| 
+    f.write($broken_paths.join("\n")) 
+  }
+end
