@@ -58,16 +58,11 @@ class FileDefinition
     begin 
       #@mime_type = `file -b --mime #{path}`
       @mime_type = MIME::Types.type_for(path)
-    rescue ArgumentError
-      puts "MIME-Type unavailable - invalid symbol in path: #{@path}"
-      @mime_type = "?"
-    end
-    
-    begin
       @type_description = $fm.file(@path)
-    rescue ArgumentError
-      puts "Magic type description unavailable - invalid symbol in path: #{@path}"
-      @mime_type = "?"
+    rescue ArgumentError # if this happens you should definitly repair some file names
+      puts "type information unavailable - invalid symbol in path: #{@path}"
+      @mime_type = "unavailable"
+      @type_description = "unavailable"
     end
   end
     
