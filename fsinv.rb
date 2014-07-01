@@ -1,8 +1,10 @@
 #!/usr/bin/env ruby
+# encoding: utf-8
 
 require 'mime/types'
 require 'filemagic'
 require 'json'
+require 'pathname'
 
 # use this if you see a KB as 2^10 bits
 #$BYTES_IN_KiB = 2**10
@@ -56,13 +58,20 @@ class FileDefinition
       @bytes = bytes
     end
     
-    begin 
+    begin
       #@mime_type = `file -b --mime #{path}`
       @mime_type = MIME::Types.type_for(path)
+    rescue ArgumentError # if this happens you should definitly repair some file names
+      @mime_type = []
+    end
+    
+    begin 
       @type_description = $fm.file(@path)
     rescue ArgumentError # if this happens you should definitly repair some file names
-      puts "type information unavailable - invalid symbol in path: #{@path}"
-      @mime_type = "unavailable"
+      puts "file magic information unavailable - invalid symbol in path: #{@path}"
+      @type_description = "unavailable"
+    rescue FileMagicError
+      puts "file magic information unavailable - file magic error"
       @type_description = "unavailable"
     end
   end
@@ -70,10 +79,14 @@ class FileDefinition
   def to_json()
     begin 
       p = sanitize_string(@path)
-      return "\{ \"type\" : \"file\", \"path\" : \"#{p}\", \"bytes\" : \"#{@bytes}\", \"mime_type\" : \"#{@mime_type.join(', ')}\", \"type_description\" : \"#{@type_description}\" \}"
+      json_item = "\{ \"type\" : \"file\", \"path\" : \"#{p}\", \"bytes\" : \"#{@bytes}\", \"mime_type\" : \"#{@mime_type.join(', ')}\", \"type_description\" : \"#{@type_description}\" \}"
+      return json_item.force_encoding("utf-8")
     rescue ArgumentError
       puts "Invalid symbol in path: #{@path}"
       $broken_paths << @path
+      return ""
+    rescue UndefinedConversionError
+      puts json_item
       return ""
     end
   end
@@ -98,11 +111,15 @@ class DirectoryDefinition
     #files += "]"
     begin 
       p = sanitize_string(@path)
-      return "\{ \"type\" : \"directory\", \"path\" : \"#{p}\", \"bytes\" : \"#{@bytes}\", \"files\" : [ #{files.join(", ")} ] \}"
+      json_item = "\{ \"type\" : \"directory\", \"path\" : \"#{p}\", \"bytes\" : \"#{@bytes}\", \"files\" : [ #{files.join(", ")} ] \}"
+      return json_item.force_encoding("utf-8")
     rescue ArgumentError
       puts "Invalid symbol in path: #{@path}"
       $broken_paths << @path
       return "" # do not return invalid dirs
+    rescue UndefinedConversionError
+      puts json_item
+      return ""
     end
   end
 end
@@ -111,14 +128,18 @@ end
 def define_folder(folder_path)
   curr_dir = DirectoryDefinition.new(folder_path, 0, [])
   
-  search_string = File.join(folder_path,'*')
-  puts("search string: #{search_string}")
+  #search_string = File.join(folder_path,'*')
+  #puts("search string: #{search_string}")
+  #wd_files = Dir.glob(search_string)
+  #wd_files.each{ |file|
   
-  wd_files = Dir.glob(search_string)
+  Pathname.new(folder_path).children.each { |f| 
     
-  wd_files.each{ |file|
+    file = f.to_s.encode("UTF-8")
+    puts file
     
-    if File.directory?(file) && File.extname(file) != '.app'
+    #if File.directory?(file) && File.extname(file) != '.app'
+    if File.directory?(file)
       sub_folder = define_folder(file)
       curr_dir.file_list << sub_folder
       curr_dir.bytes += sub_folder.bytes
