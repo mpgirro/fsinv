@@ -2,6 +2,7 @@
 
 require 'mime/types'
 require 'filemagic'
+require 'json'
 
 # use this if you see a KB as 2^10 bits
 #$BYTES_IN_KiB = 2**10
@@ -24,52 +25,56 @@ def sanitize_string(string)
   return string
 end
 
-def get_size_string(size_in_bytes)
-  if size_in_bytes > $BYTES_IN_TB
-    return "%f TB" % (size_in_bytes.to_f / $BYTES_IN_TB)
-  elsif size_in_bytes > $BYTES_IN_GB
-    return "%f GB" % (size_in_bytes.to_f / $BYTES_IN_GB)
-  elsif size_in_bytes > $BYTES_IN_MB
-    return "%f MB" % (size_in_bytes.to_f / $BYTES_IN_MB)
-  elsif size_in_bytes > $BYTES_IN_KB
-    return "%f KB" % (size_in_bytes.to_f / $BYTES_IN_KB)
+def get_size_string(bytes)
+  if bytes > $BYTES_IN_TB
+    return "%f TB" % (bytes.to_f / $BYTES_IN_TB)
+  elsif bytes > $BYTES_IN_GB
+    return "%f GB" % (bytes.to_f / $BYTES_IN_GB)
+  elsif bytes > $BYTES_IN_MB
+    return "%f MB" % (bytes.to_f / $BYTES_IN_MB)
+  elsif bytes > $BYTES_IN_KB
+    return "%f KB" % (bytes.to_f / $BYTES_IN_KB)
   else
-    return "#{size_in_bytes} B"
+    return "#{bytes} B"
   end
 end
 
 class FileDefinition
-  attr_accessor :size_in_bytes,:path,:mime_type,:description
-  def initialize(path, size_in_bytes = nil)
+  attr_accessor :bytes,:path,:mime_type,:type_description
+  def initialize(path, bytes = nil)
     @path = path
-    if size_in_bytes.nil?
+    if bytes.nil?
       
-      @size_in_bytes = 0
+      @bytes = 0
       begin
-        @size_in_bytes = File.size(path)
+        @bytes = File.size(path)
       rescue Exception => e
         puts("exception getting size for file: #{path}")
       end
     else
-      @size_in_bytes = size_in_bytes
+      @bytes = bytes
     end
     
-    #@mime_type = `file -b --mime #{path}`
-    @mime_type = MIME::Types.type_for(path)
+    begin 
+      #@mime_type = `file -b --mime #{path}`
+      @mime_type = MIME::Types.type_for(path)
+    rescue ArgumentError
+      puts "MIME-Type unavailable - invalid symbol in path: #{@path}"
+      @mime_type = "?"
+    end
     
-    @description = $fm.file(@path)
+    begin
+      @type_description = $fm.file(@path)
+    rescue ArgumentError
+      puts "Magic type description unavailable - invalid symbol in path: #{@path}"
+      @mime_type = "?"
+    end
   end
     
   def to_json()
     begin 
       p = sanitize_string(@path)
-      return "\{  
-                  \"type\" : \"file\", 
-                  \"path\" : \"#{p}\", 
-                  \"size_in_bytes\" : \"#{@size_in_bytes}\", 
-                  \"mime_type\" : \"#{@mime_type.join(', ')}\",
-                  \"description\" : \"#{@description}\"
-              \}"
+      return "\{ \"type\" : \"file\", \"path\" : \"#{p}\", \"bytes\" : \"#{@bytes}\", \"mime_type\" : \"#{@mime_type.join(', ')}\", \"type_description\" : \"#{@type_description}\" \}"
     rescue ArgumentError
       puts "Invalid symbol in path: #{@path}"
       return ""
@@ -78,9 +83,9 @@ class FileDefinition
 end
 
 class DirectoryDefinition
-  attr_accessor :path,:size_in_bytes,:file_list
+  attr_accessor :path,:bytes,:file_list,:file_count
   def initialize(path, size, file_list)
-    @path, @size_in_bytes, @file_list = path, size, file_list
+    @path, @bytes, @file_list = path, size, file_list, @file_count = 0
   end
   
   def to_json()
@@ -96,14 +101,7 @@ class DirectoryDefinition
     #files += "]"
     begin 
       p = sanitize_string(@path)
-      return "\{ 
-                \"type\" : \"directory\", 
-                \"path\" : \"#{p}\", 
-                \"size_in_bytes\" : \"#{@size_in_bytes}\", 
-                \"files\" : [
-                  #{files.join(",")}
-                ]
-              \}"
+      return "\{ \"type\" : \"directory\", \"path\" : \"#{p}\", \"bytes\" : \"#{@bytes}\", \"files\" : [ #{files.join(", ")} ] \}"
     rescue ArgumentError
       puts "Invalid symbol in path: #{@path}"
       return "" # do not return invalid dirs
@@ -125,10 +123,10 @@ def define_folder(folder_path)
     if File.directory?(file) && File.extname(file) != '.app'
       sub_folder = define_folder(file)
       curr_dir.file_list << sub_folder
-      curr_dir.size_in_bytes += sub_folder.size_in_bytes
+      curr_dir.bytes += sub_folder.bytes
     else
       sub_file = FileDefinition.new(file)
-      curr_dir.size_in_bytes += sub_file.size_in_bytes
+      curr_dir.bytes += sub_file.bytes
       curr_dir.file_list << sub_file
     end
   }
@@ -144,10 +142,10 @@ end
 dir_path = ARGV[0]
 
 main_dir = define_folder(dir_path)
-size = main_dir.size_in_bytes
+size = main_dir.bytes
 puts("directory info:")
 puts("path: #{main_dir.path}")
-puts("size: #{get_size_string(size)} (#{size} B)")
+puts("size: #{get_size_string(size)} (#{size} Bytes)")
 puts("files: #{main_dir.file_list.length}")
 
 #main_dir.file_list.each { |file|
@@ -156,5 +154,9 @@ puts("files: #{main_dir.file_list.length}")
 
 #puts("json:")
 puts("writing json to ./file_structure.json")
-File.open("file_structure.json", 'w') {|f| f.write(main_dir.to_json()) }
+File.open("file_structure.json", 'w') {|f| 
+  #json_str = main_dir.to_json()
+  json_str = JSON.pretty_generate(JSON.parse(main_dir.to_json()))
+  f.write(json_str) 
+}
 #puts(main_dir.to_json())
