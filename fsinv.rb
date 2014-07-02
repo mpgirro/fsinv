@@ -6,7 +6,7 @@ require 'filemagic'
 require 'json'
 require 'pathname'
 
-# use this if you see a KB as 2^10 bits
+# use these if you find a KB to be 2^10 bits
 #$BYTES_IN_KiB = 2**10
 #$BYTES_IN_MiB = 2**20
 #$BYTES_IN_GiB = 2**30
@@ -17,9 +17,6 @@ $BYTES_IN_KB = 10**3
 $BYTES_IN_MB = 10**6
 $BYTES_IN_GB = 10**9
 $BYTES_IN_TB = 10**12
-
-$fm = FileMagic.new # we will need this quite a lot
-$broken_paths = []
 
 def sanitize_string(string)
   string = string.encode("UTF-16BE", :invalid=>:replace, :undef => :replace, :replace=>"_").encode("UTF-8")
@@ -42,8 +39,47 @@ def get_size_string(bytes)
   end
 end
 
+class DescriptionTable
+  
+  attr_accessor :descr_map, :idcursor
+  
+  def initialize()
+    @descr_map = Hash.new
+    @idcursor = 0
+    self.add("unavailable")
+  end  
+  
+  def contains?(descr)
+    return @descr_map.has_value?(descr)
+  end
+  
+  def add(descr)
+    @descr_map[idcursor] = descr
+    @idcursor += 1
+  end
+  
+  def getid(descr)
+    return @descr_map.key(descr)
+  end
+  
+  def getdescr(id)
+    return @descr_map[id]
+  end
+  
+  def to_json()
+    descr_arr = []
+    @descr_map.each { | id, descr | 
+      descr_arr << "\{ \"id\" : #{id}, \"description\" : \"#{descr}\" \}"
+    }
+    return "[ #{descr_arr.join(", ")} ]"
+  end
+  
+end
+
 class FileDefinition
-  attr_accessor :bytes,:path,:mime,:description
+  
+  attr_accessor :bytes,:path,:mime,:description_id
+  
   def initialize(path, bytes = nil)
     
     @path = path
@@ -68,21 +104,25 @@ class FileDefinition
     end
     
     begin 
-      magic_descr = $fm.file(@path)
-      @description = sanitize_string(magic_descr)
+      description = sanitize_string($fmagic.file(@path))
+      if !$description_tab.contains?(description)
+        $description_tab.add(description)
+      end
+      #@description = magic_descr
+      @description_id = $description_tab.getid(description)
     rescue
       puts "file magic information unavailable"
-      @description = "description unavailable"
+      @description_id = 0
     end
   end
     
   def to_json()
     begin 
       p = sanitize_string(@path)
-      json_item = "\{ \"type\" : \"file\", \"path\" : \"#{p}\", \"bytes\" : \"#{@bytes}\", \"mime\" : \"#{@mime.join(', ')}\", \"description\" : \"#{@description}\" \}"
+      json_item = "\{ \"type\" : \"file\", \"path\" : \"#{p}\", \"bytes\" : \"#{@bytes}\", \"mime\" : \"#{@mime.join(', ')}\", \"description_id\" : #{@description_id} \}"
       return json_item.force_encoding("utf-8")
     rescue ArgumentError
-      puts "Invalid symbol in path: #{@path}"
+      puts "invalid symbol in path: #{@path}"
       $broken_paths << @path
       return "\{ \"type\" : \"argument error\" \}"
     rescue UndefinedConversionError
@@ -93,9 +133,11 @@ class FileDefinition
 end
 
 class DirectoryDefinition
+  
   attr_accessor :path,:bytes,:file_list,:file_count
+  
   def initialize(path, size, file_list)
-    @path, @bytes, @file_list = path, size, file_list, @file_count = 0
+    @path, @bytes, @file_list = path, size, file_list, @file_count = 0, @children = []
     puts "processing dir:  #{@path}"
   end
   
@@ -120,13 +162,9 @@ class DirectoryDefinition
 end
 
 #returns DirectoryDefinition object
-def define_folder(folder_path)
-  curr_dir = DirectoryDefinition.new(folder_path, 0, [])
+def parse(folder_path)
   
-  #search_string = File.join(folder_path,'*')
-  #puts("search string: #{search_string}")
-  #wd_files = Dir.glob(search_string)
-  #wd_files.each{ |file|
+  curr_dir = DirectoryDefinition.new(folder_path, 0, [])
   
   Pathname.new(folder_path).children.each { |f| 
     
@@ -134,7 +172,7 @@ def define_folder(folder_path)
     
     #if File.directory?(file) && File.extname(file) != '.app'
     if File.directory?(file)
-      sub_folder = define_folder(file)
+      sub_folder = parse(file)
       curr_dir.file_list << sub_folder
       curr_dir.bytes += sub_folder.bytes
     else
@@ -152,9 +190,13 @@ if ARGV[0].nil? || !File.directory?(ARGV[0])
   return
 end
 
-dir_path = ARGV[0]
+main_path = ARGV[0]
 
-main_dir = define_folder(dir_path)
+$fmagic = FileMagic.new 
+$broken_paths = []
+$description_tab = DescriptionTable.new
+
+main_dir = parse(main_path)
 size = main_dir.bytes
 puts("directory info:")
 puts("path: #{main_dir.path}")
@@ -164,8 +206,9 @@ puts("files: #{main_dir.file_list.length}")
 puts "writing JSON to ./file_structure.json" 
 File.open("file_structure.json", 'w') {|f| 
   #json_str = main_dir.to_json()
-  json_str = JSON.pretty_generate(JSON.parse(main_dir.to_json()))
-  f.write(json_str) 
+  simple_json_str = "\{ \"description_table\" : #{$description_tab.to_json}, \"file_structure\" : #{main_dir.to_json} \}"
+  pretty_json_str = JSON.pretty_generate(JSON.parse(simple_json_str, :max_nesting => 100))
+  f.write(pretty_json_str) 
 }
 
 if $broken_paths.length > 0
