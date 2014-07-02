@@ -4,6 +4,8 @@
 require 'mime/types'
 require 'filemagic'
 require 'json'
+require 'yaml'
+require 'active_support/all' # to get to_xml()
 require 'pathname'
 
 # use these if you find a KB to be 2^10 bits
@@ -18,7 +20,7 @@ $BYTES_IN_MB = 10**6
 $BYTES_IN_GB = 10**9
 $BYTES_IN_TB = 10**12
 
-$IGNORE_FILES = ['.AppleDoube','.Parent','.DS_Store']
+$IGNORE_FILES = ['.AppleDoube','.Parent','.DS_Store','Thumbs.db']
 
 def sanitize_string(string)
   string = string.encode("UTF-16BE", :invalid=>:replace, :undef => :replace, :replace=>"_").encode("UTF-8")
@@ -41,7 +43,7 @@ def get_size_string(bytes)
   end
 end
 
-class DescriptionTable
+class LookupTable
   
   attr_accessor :descr_map, :idcursor
   
@@ -80,7 +82,7 @@ end
 
 class FileDefinition
   
-  attr_accessor :bytes,:path,:mime,:description_id
+  attr_accessor :bytes,:path,:mime_id,:magic_id
   
   def initialize(path, bytes = nil)
     
@@ -100,28 +102,33 @@ class FileDefinition
     
     begin
       #@mime = `file -b --mime #{path}`
-      @mime = MIME::Types.type_for(@path)
+      #@mime = MIME::Types.type_for(@path)
+      description = MIME::Types.type_for(@path).join(', ')
+      if !$mime_tab.contains?(description)
+        $mime_tab.add(description)
+      end
+      @mime_id = $mime_tab.getid(description)
     rescue ArgumentError # if this happens you should definitly repair some file names
-      @mime = []
+      @mime_id = 0
     end
     
     begin 
       description = sanitize_string($fmagic.file(@path))
-      if !$description_tab.contains?(description)
-        $description_tab.add(description)
+      if !$magic_tab.contains?(description)
+        $magic_tab.add(description)
       end
       #@description = magic_descr
-      @description_id = $description_tab.getid(description)
+      @magic_id = $magic_tab.getid(description)
     rescue
       puts "file magic information unavailable"
-      @description_id = 0
+      @magic_id = 0
     end
   end
     
   def to_json()
     begin 
       p = sanitize_string(@path)
-      json_item = "\{ \"type\" : \"file\", \"path\" : \"#{p}\", \"bytes\" : \"#{@bytes}\", \"mime\" : \"#{@mime.join(', ')}\", \"description_id\" : #{@description_id} \}"
+      json_item = "\{ \"type\" : \"file\", \"path\" : \"#{p}\", \"bytes\" : \"#{@bytes}\", \"mime_id\" : #{@mime_id}, \"magic_id\" : #{@magic_id} \}"
       return json_item.force_encoding("utf-8")
     rescue ArgumentError
       puts "invalid symbol in path: #{@path}"
@@ -200,7 +207,8 @@ main_path = ARGV[0]
 
 $fmagic = FileMagic.new 
 $broken_paths = []
-$description_tab = DescriptionTable.new
+$magic_tab = LookupTable.new # magic file descriptions
+$mime_tab = LookupTable.new
 
 main_dir = parse(main_path)
 size = main_dir.bytes
@@ -209,20 +217,31 @@ puts("path: #{main_dir.path}")
 puts("size: #{get_size_string(size)} (#{size} Bytes)")
 puts("files: #{main_dir.file_list.length}")
 
-puts "writing JSON to ./file_structure.json" 
-File.open("file_structure.json", 'w') {|f| 
-  #json_str = main_dir.to_json()
-  simple_json_str = "\{ \"description_table\" : #{$description_tab.to_json}, \"file_structure\" : #{main_dir.to_json} \}"
-  pretty_json_str = JSON.pretty_generate(JSON.parse(simple_json_str, :max_nesting => 100))
-  f.write(pretty_json_str) 
-}
+
+
+#json_str = main_dir.to_json()
+json_str = "\{ \"magic_table\" : #{$magic_tab.to_json}, \"mime_table\" : #{$mime_tab.to_json}, \"file_structure\" : #{main_dir.to_json} \}"
+json_data = JSON.parse(json_str, :max_nesting => 100)
+yml_data = YAML::dump(json_data)
+
+puts "writing JSON to inventory.json" 
+json_file = File.open("inventory.json", 'w')
+json_file.write(JSON.pretty_generate(json_data)) 
+
+puts "writing YAML to inventory.yaml" 
+yml_file = File.open("inventory.yaml", 'w')
+yml_file.write(yml_data)
+
+puts "writing XML to inventory.xml" 
+xml_file = File.open("inventory.xml", 'w')
+xml_file.write(json_data.to_xml(:root => :my_root))
 
 #File.open("file_structure.yaml", 'w') {|f| 
-#  yaml_str = "---\n #{$description_tab.to_yaml} \n---\n "
+#  yaml_str = "---\n #{$magic_tab.to_yaml} \n---\n "
 #}
 
 if $broken_paths.length > 0
-  puts "writing broken links to ./broken_links.txt"
+  puts "writing broken links to ./broken_paths.txt"
   File.open("broken_links.txt", 'w') {|f| 
     f.write($broken_paths.join("\n")) 
   }
