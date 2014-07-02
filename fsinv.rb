@@ -22,7 +22,7 @@ $fm = FileMagic.new # we will need this quite a lot
 $broken_paths = []
 
 def sanitize_string(string)
-  string = string.encode("UTF-16BE", :invalid=>:replace, :replace=>"_").encode("UTF-8")
+  string = string.encode("UTF-16BE", :invalid=>:replace, :undef => :replace, :replace=>"_").encode("UTF-8")
   pattern = /\"/
   string = string.gsub(pattern, "\\\"") # escape double quotes in string
   return string
@@ -43,14 +43,16 @@ def get_size_string(bytes)
 end
 
 class FileDefinition
-  attr_accessor :bytes,:path,:mime_type,:type_description
+  attr_accessor :bytes,:path,:mime,:description
   def initialize(path, bytes = nil)
+    
     @path = path
+    puts "processing file: #{@path}"
+    
     if bytes.nil?
-      
       @bytes = 0
       begin
-        @bytes = File.size(path)
+        @bytes = File.size(@path)
       rescue Exception => e
         puts("exception getting size for file: #{path}")
       end
@@ -59,35 +61,33 @@ class FileDefinition
     end
     
     begin
-      #@mime_type = `file -b --mime #{path}`
-      @mime_type = MIME::Types.type_for(path)
+      #@mime = `file -b --mime #{path}`
+      @mime = MIME::Types.type_for(@path)
     rescue ArgumentError # if this happens you should definitly repair some file names
-      @mime_type = []
+      @mime = []
     end
     
     begin 
-      @type_description = $fm.file(@path)
-    rescue ArgumentError # if this happens you should definitly repair some file names
-      puts "file magic information unavailable - invalid symbol in path: #{@path}"
-      @type_description = "unavailable"
-    rescue FileMagicError
-      puts "file magic information unavailable - file magic error"
-      @type_description = "unavailable"
+      magic_descr = $fm.file(@path)
+      @description = sanitize_string(magic_descr)
+    rescue
+      puts "file magic information unavailable"
+      @description = "description unavailable"
     end
   end
     
   def to_json()
     begin 
       p = sanitize_string(@path)
-      json_item = "\{ \"type\" : \"file\", \"path\" : \"#{p}\", \"bytes\" : \"#{@bytes}\", \"mime_type\" : \"#{@mime_type.join(', ')}\", \"type_description\" : \"#{@type_description}\" \}"
+      json_item = "\{ \"type\" : \"file\", \"path\" : \"#{p}\", \"bytes\" : \"#{@bytes}\", \"mime\" : \"#{@mime.join(', ')}\", \"description\" : \"#{@description}\" \}"
       return json_item.force_encoding("utf-8")
     rescue ArgumentError
       puts "Invalid symbol in path: #{@path}"
       $broken_paths << @path
-      return ""
+      return "\{ \"type\" : \"argument error\" \}"
     rescue UndefinedConversionError
-      puts json_item
-      return ""
+      puts "undefined conversion error"
+      return "\{ \"type\" : \"conversion error\" \}"
     end
   end
 end
@@ -96,30 +96,25 @@ class DirectoryDefinition
   attr_accessor :path,:bytes,:file_list,:file_count
   def initialize(path, size, file_list)
     @path, @bytes, @file_list = path, size, file_list, @file_count = 0
+    puts "processing dir:  #{@path}"
   end
   
   def to_json()
-    #files = "["
     files = []
     @file_list.each {|f|
-      #unless files.empty?
-      #  files += ", "
-      #end
-      #files = files + f.to_json()
       files << f.to_json()
     }
-    #files += "]"
     begin 
       p = sanitize_string(@path)
       json_item = "\{ \"type\" : \"directory\", \"path\" : \"#{p}\", \"bytes\" : \"#{@bytes}\", \"files\" : [ #{files.join(", ")} ] \}"
       return json_item.force_encoding("utf-8")
     rescue ArgumentError
-      puts "Invalid symbol in path: #{@path}"
+      puts "invalid symbol in path: #{@path}"
       $broken_paths << @path
-      return "" # do not return invalid dirs
+      return "\{ \"type\" : \"argument error\" \}"
     rescue UndefinedConversionError
-      puts json_item
-      return ""
+      puts "undefined conversion error"
+      return "\{ \"type\" : \"conversion error\" \}"
     end
   end
 end
@@ -136,7 +131,6 @@ def define_folder(folder_path)
   Pathname.new(folder_path).children.each { |f| 
     
     file = f.to_s.encode("UTF-8")
-    puts file
     
     #if File.directory?(file) && File.extname(file) != '.app'
     if File.directory?(file)
