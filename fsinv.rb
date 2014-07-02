@@ -18,6 +18,8 @@ $BYTES_IN_MB = 10**6
 $BYTES_IN_GB = 10**9
 $BYTES_IN_TB = 10**12
 
+$IGNORE_FILES = ['.AppleDoube','.Parent','.DS_Store']
+
 def sanitize_string(string)
   string = string.encode("UTF-16BE", :invalid=>:replace, :undef => :replace, :replace=>"_").encode("UTF-8")
   pattern = /\"/
@@ -166,21 +168,25 @@ def parse(folder_path)
   
   curr_dir = DirectoryDefinition.new(folder_path, 0, [])
   
-  Pathname.new(folder_path).children.each { |f| 
-    
-    file = f.to_s.encode("UTF-8")
-    
-    #if File.directory?(file) && File.extname(file) != '.app'
-    if File.directory?(file)
-      sub_folder = parse(file)
-      curr_dir.file_list << sub_folder
-      curr_dir.bytes += sub_folder.bytes
-    else
-      sub_file = FileDefinition.new(file)
-      curr_dir.bytes += sub_file.bytes
-      curr_dir.file_list << sub_file
-    end
-  }
+  begin
+    Pathname.new(folder_path).children.each { |f| 
+      file = f.to_s.encode("UTF-8")
+      if File.directory?(file) && File.extname(file) != '.app'
+      #if File.directory?(file)
+        sub_folder = parse(file)
+        curr_dir.file_list << sub_folder
+        curr_dir.bytes += sub_folder.bytes
+      elsif $IGNORE_FILES.include?(File.basename(file))
+        # do nothing
+      else
+        sub_file = FileDefinition.new(file)
+        curr_dir.bytes += sub_file.bytes
+        curr_dir.file_list << sub_file
+      end
+    }
+  rescue
+    puts "permission denied, skipping #{curr_dir}"
+  end
   return curr_dir
 end
 
@@ -210,6 +216,10 @@ File.open("file_structure.json", 'w') {|f|
   pretty_json_str = JSON.pretty_generate(JSON.parse(simple_json_str, :max_nesting => 100))
   f.write(pretty_json_str) 
 }
+
+#File.open("file_structure.yaml", 'w') {|f| 
+#  yaml_str = "---\n #{$description_tab.to_yaml} \n---\n "
+#}
 
 if $broken_paths.length > 0
   puts "writing broken links to ./broken_links.txt"
