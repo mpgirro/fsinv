@@ -180,10 +180,10 @@ end
 
 class DirectoryDefinition
   
-  attr_accessor :path,:bytes,:file_list,:file_count
+  attr_accessor :path,:bytes,:file_list,:file_count,:item_count
   
   def initialize(path, size, file_list)
-    @path, @bytes, @file_list = path, size, file_list, @file_count = 0
+    @path, @bytes, @file_list = path, size, file_list, @file_count = 0, @item_count = 1
     puts "processing #{@path}/*"
   end
   
@@ -201,7 +201,7 @@ class DirectoryDefinition
     rescue UndefinedConversionError
       puts "error with path encoding: undefined conversion error"
     end
-    return {"type" => "directory", "path" => p, "bytes" => bytes, "file_count" => file_count, "file_list" => file_list}
+    return {"type" => "directory", "path" => p, "bytes" => bytes, "file_count" => file_count, "file_list" => file_list, "item_count" => item_count}
   end
   
   def to_json(*a)
@@ -209,7 +209,7 @@ class DirectoryDefinition
   end
   
   def marshal_dump
-    return {'path' => path, 'bytes' => bytes, 'file_list' => file_list, 'file_count' => file_count}
+    return {'path' => path, 'bytes' => bytes, 'file_list' => file_list, 'file_count' => file_count, 'item_count' => item_count}
   end
 
   def marshal_load(data)
@@ -217,6 +217,7 @@ class DirectoryDefinition
     self.bytes = data['bytes']
     self.file_list = data['file_list']
     self.file_count = data['file_count']
+    self.item_count = data['item_count']
   end
 end
 
@@ -240,10 +241,12 @@ def parse(folder_path)
         sub_folder = parse(file)
         curr_dir.file_list << sub_folder
         curr_dir.bytes += sub_folder.bytes
+        curr_dir.item_count += sub_folder.item_count
       else
         sub_file = FileDefinition.new(file)
         curr_dir.bytes += sub_file.bytes
         curr_dir.file_list << sub_file
+        curr_dir.item_count += 1
       end
     }
   rescue
