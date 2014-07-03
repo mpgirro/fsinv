@@ -89,11 +89,11 @@ class LookupTable
   end
   
   def to_json(*a)
-    as_json.to_json(*a)
+    return as_json.to_json(*a)
   end
   
   def marshal_dump
-    {'descr_map' => descr_map, 'idcursor' => idcursor}
+    return {'descr_map' => descr_map, 'idcursor' => idcursor}
   end
 
   def marshal_load(data)
@@ -252,6 +252,34 @@ def parse(folder_path)
   return curr_dir
 end
 
+class FsInventory
+  
+  attr_accessor :magic_tab, :mime_tab, :file_structure
+  
+  def initialize(magic_tab, mime_tab, file_structure)
+    @magic_tab = magic_tab
+    @mime_tab  = mime_tab
+    @file_structure = file_structure
+  end
+  
+  def root_path()
+    return @file_structure.path
+  end  
+  
+  def size()
+    return file_structure.bytes
+  end
+  
+  def as_json(options = { })
+    return {"magic_tab" => magic_tab, "mime_tab" => mime_tab, "file_structure" => file_structure}
+  end
+  
+  def to_json(*a)
+    as_json.to_json(*a)
+  end
+  
+end
+
 dir_path = ''
 if ARGV[0].nil? || !File.directory?(ARGV[0])
   puts("directory required.")
@@ -266,28 +294,29 @@ $magic_tab = LookupTable.new # magic file descriptions
 $mime_tab = LookupTable.new
 
 fs_tree = parse(main_path)
-size = fs_tree.bytes
+
+inventory = FsInventory.new($magic_tab, $mime_tab, fs_tree)
+
+
+size = inventory.size
 puts("directory info:")
 puts("path: #{fs_tree.path}")
 puts("size: #{get_size_string(size)} (#{size} Bytes)")
 puts("files: #{fs_tree.file_list.length}")
 
 puts "writing marshalled objects"
-File.open('tree-dump.out', 'wb') {|f| f.write(Marshal.dump(fs_tree)) }
-File.open('magictab-dump.out', 'wb') {|f| f.write(Marshal.dump($magic_tab)) }
-File.open('mimetab-dump.out', 'wb') {|f| f.write(Marshal.dump($mime_tab)) }
+File.open('filestructure-dump.bin', 'wb') {|f| f.write(Marshal.dump(inventory.file_structure)) }
+File.open('magictab-dump.bin', 'wb') {|f| f.write(Marshal.dump(inventory.magic_tab)) }
+File.open('mimetab-dump.bin', 'wb') {|f| f.write(Marshal.dump(inventory.mime_tab)) }
 
-File.open('tree-dump.yaml', 'w') {|f| f.write(YAML.dump(fs_tree)) }
-File.open('magictab-dump.yaml', 'w') {|f| f.write(YAML.dump($magic_tab)) }
-File.open('mimetab-dump.yaml', 'w') {|f| f.write(YAML.dump($mime_tab)) }
+File.open('filestructure-dump.yaml', 'w') {|f| f.write(YAML.dump(inventory.file_structure)) }
+File.open('magictab-dump.yaml', 'w') {|f| f.write(YAML.dump(inventory.magic_tab)) }
+File.open('mimetab-dump.yaml', 'w') {|f| f.write(YAML.dump(inventory.mime_tab)) }
 
-#json_str = "\{ \"magic_table\" : #{$magic_tab.to_json}, \"mime_table\" : #{$mime_tab.to_json}, \"file_structure\" : #{fs_tree.to_json} \}"
-#json_data = JSON.parse(json_str, :max_nesting => 100)
+#structure_map = { "magic_table" => $magic_tab, "mime_table" => $mime_tab, "file_structure" => fs_tree }
 
-structure_map = { "magic_table" => $magic_tab, "mime_table" => $mime_tab, "file_structure" => fs_tree }
-#structure_map = "\{ \"magic_table\" : #{$magic_tab.to_json}, \"mime_table\" : #{$mime_tab.to_json}, \"file_structure\" : #{fs_tree.to_json} }"
-json_data = JSON.parse(structure_map.to_json, :max_nesting => 100)
-json_data = JSON.pretty_generate(json_data) 
+json_data = JSON.parse(inventory.to_json, :max_nesting => 100)
+json_data = JSON.pretty_generate(json_data, :max_nesting => 100) 
 #puts json_data
 
 yml_data = YAML::dump(json_data)
