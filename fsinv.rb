@@ -71,11 +71,12 @@ class LookupTable
   end
   
   def to_json()
-    descr_arr = []
-    @descr_map.each { | id, descr | 
-      descr_arr << "\{ \"id\" : #{id}, \"description\" : \"#{descr}\" \}"
-    }
-    return "[ #{descr_arr.join(", ")} ]"
+    #descr_arr = []
+    #@descr_map.each { | id, descr | 
+    #  descr_arr << "\{ \"id\" : #{id}, \"description\" : \"#{descr}\" \}"
+      #}
+    #return "[ #{descr_arr.join(", ")} ]"
+    return descr_map.to_json
   end
   
   def marshal_dump
@@ -137,8 +138,9 @@ class FileDefinition
   def to_json()
     begin 
       p = sanitize_string(@path)
-      json_item = "\{ \"type\" : \"file\", \"path\" : \"#{p}\", \"bytes\" : \"#{@bytes}\", \"mime_id\" : #{@mime_id}, \"magic_id\" : #{@magic_id} \}"
-      return json_item.force_encoding("utf-8")
+      #json_item = "\{ \"type\" : \"file\", \"path\" : \"#{p}\", \"bytes\" : \"#{@bytes}\", \"mime_id\" : #{@mime_id}, \"magic_id\" : #{@magic_id} \}"
+      #return json_item.force_encoding("utf-8")
+      return {'type' => 'file', 'path' => p, 'bytes' => bytes, 'mime_id' => mime_id, 'magic_id' => magic_id}.to_json
     rescue ArgumentError
       puts "invalid symbol in path: #{@path}"
       $broken_paths << @path
@@ -255,13 +257,13 @@ puts("size: #{get_size_string(size)} (#{size} Bytes)")
 puts("files: #{fs_tree.file_list.length}")
 
 puts "writing marshalled objects"
-File.open('fs_tree.out', 'w') {|f| f.write(Marshal.dump(fs_tree)) }
-File.open('magic_tab.out', 'w') {|f| f.write(Marshal.dump($magic_tab)) }
-File.open('mime_tab.out', 'w') {|f| f.write(Marshal.dump($mime_tab)) }
+File.open('tree-dump.out', 'w') {|f| f.write(Marshal.dump(fs_tree)) }
+File.open('magictab-dump.out', 'w') {|f| f.write(Marshal.dump($magic_tab)) }
+File.open('mimetab-dump.out', 'w') {|f| f.write(Marshal.dump($mime_tab)) }
 
-File.open('fs_tree.yaml', 'w') {|f| f.write(YAML.dump(fs_tree)) }
-File.open('magic_tab.yaml', 'w') {|f| f.write(YAML.dump($magic_tab)) }
-File.open('mime_tab.yaml', 'w') {|f| f.write(YAML.dump($mime_tab)) }
+File.open('tree-dump.yaml', 'w') {|f| f.write(YAML.dump(fs_tree)) }
+File.open('magictab-dump.yaml', 'w') {|f| f.write(YAML.dump($magic_tab)) }
+File.open('mimetab-dump.yaml', 'w') {|f| f.write(YAML.dump($mime_tab)) }
 
 #json_str = fs_tree.to_json()
 json_str = "\{ \"magic_table\" : #{$magic_tab.to_json}, \"mime_table\" : #{$mime_tab.to_json}, \"file_structure\" : #{fs_tree.to_json} \}"
