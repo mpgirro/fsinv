@@ -5,7 +5,7 @@ require 'mime/types'
 require 'filemagic'
 require 'json'
 require 'yaml'
-#require 'active_support/all' # to get to_xml()
+require 'active_support/all' # to get to_xml()
 require 'pathname'
 
 # use these if you find a KB to be 2^10 bits
@@ -20,10 +20,10 @@ $BYTES_IN_MB = 10**6
 $BYTES_IN_GB = 10**9
 $BYTES_IN_TB = 10**12
 
-$IGNORE_FILES = ['.AppleDouble','.Parent','.DS_Store','Thumbs.db']
+$IGNORE_FILES = ['.AppleDouble','.Parent','.DS_Store','Thumbs.db','__MACOSX']
 
 def sanitize_string(string)
-  string = string.encode("UTF-16BE", :invalid=>:replace, :undef => :replace, :replace=>"_").encode("UTF-8")
+  string = string.encode("UTF-16BE", :invalid=>:replace, :undef => :replace, :replace=>"?").encode("UTF-8")
   pattern = /\"/
   string = string.gsub(pattern, "\\\"") # escape double quotes in string
   return string
@@ -158,22 +158,15 @@ class FileDefinition
     rescue UndefinedConversionError
       puts "error with path encoding: undefined conversion error"
     end
-    
-    return {
-      "type" => "file",
-      "path" => p,
-      "bytes" => bytes, 
-      "mime_id" => mime_id, 
-      "magic_id" => magic_id
-    }
+    return {"type" => "file","path" => p,"bytes" => bytes, "mime_id" => mime_id, "magic_id" => magic_id}
   end
     
   def to_json(*a)
-    as_json.to_json(*a)
+    return as_json.to_json(*a)
   end
   
   def marshal_dump
-    {"path" => path, "bytes" => bytes, "mime_id" => mime_id, "magic_id" => magic_id}
+    return {"path" => path, "bytes" => bytes, "mime_id" => mime_id, "magic_id" => magic_id}
   end
 
   def marshal_load(data)
@@ -195,12 +188,10 @@ class DirectoryDefinition
   end
   
   def as_json(options = { })
-    
     #files = []
     #@file_list.each {|f|
     #  files << f.to_json()
     #}
-    
     p = "path encoding broken"
     begin 
       p = sanitize_string(@path)
@@ -210,14 +201,7 @@ class DirectoryDefinition
     rescue UndefinedConversionError
       puts "error with path encoding: undefined conversion error"
     end
-    
-    return {
-      "type" => "directory",
-      "path" => p, 
-      "bytes" => bytes, 
-      "file_count" => file_count,
-      "file_list" => file_list
-    }
+    return {"type" => "directory", "path" => p, "bytes" => bytes, "file_count" => file_count, "file_list" => file_list}
   end
   
   def to_json(*a)
@@ -289,9 +273,9 @@ puts("size: #{get_size_string(size)} (#{size} Bytes)")
 puts("files: #{fs_tree.file_list.length}")
 
 puts "writing marshalled objects"
-File.open('tree-dump.out', 'w') {|f| f.write(Marshal.dump(fs_tree)) }
-File.open('magictab-dump.out', 'w') {|f| f.write(Marshal.dump($magic_tab)) }
-File.open('mimetab-dump.out', 'w') {|f| f.write(Marshal.dump($mime_tab)) }
+File.open('tree-dump.out', 'wb') {|f| f.write(Marshal.dump(fs_tree)) }
+File.open('magictab-dump.out', 'wb') {|f| f.write(Marshal.dump($magic_tab)) }
+File.open('mimetab-dump.out', 'wb') {|f| f.write(Marshal.dump($mime_tab)) }
 
 File.open('tree-dump.yaml', 'w') {|f| f.write(YAML.dump(fs_tree)) }
 File.open('magictab-dump.yaml', 'w') {|f| f.write(YAML.dump($magic_tab)) }
@@ -324,7 +308,7 @@ yml_file.write(yml_data)
 
 puts "writing XML to inventory.xml" 
 xml_file = File.open("inventory.xml", 'w')
-xml_file.write(json_data.to_xml(:root => :my_root))
+xml_file.write(json_data.to_xml)
 
 #File.open("file_structure.yaml", 'w') {|f| 
 #  yaml_str = "---\n #{$magic_tab.to_yaml} \n---\n "
