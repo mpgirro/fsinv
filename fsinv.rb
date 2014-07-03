@@ -20,7 +20,7 @@ $BYTES_IN_MB = 10**6
 $BYTES_IN_GB = 10**9
 $BYTES_IN_TB = 10**12
 
-$IGNORE_FILES = ['.AppleDoube','.Parent','.DS_Store','Thumbs.db']
+$IGNORE_FILES = ['.AppleDouble','.Parent','.DS_Store','Thumbs.db']
 
 def sanitize_string(string)
   string = string.encode("UTF-16BE", :invalid=>:replace, :undef => :replace, :replace=>"_").encode("UTF-8")
@@ -78,6 +78,15 @@ class LookupTable
     return "[ #{descr_arr.join(", ")} ]"
   end
   
+  def marshal_dump
+    {'descr_map' => descr_map, 'idcursor' => idcursor}
+  end
+
+  def marshal_load(data)
+    self.descr_map = data['descr_map']
+    self.idcursor = data['idcursor']
+  end
+  
 end
 
 class FileDefinition
@@ -87,7 +96,7 @@ class FileDefinition
   def initialize(path, bytes = nil)
     
     @path = path
-    puts "processing file: #{@path}"
+    #puts "processing file: #{@path}"
     
     if bytes.nil?
       @bytes = 0
@@ -139,6 +148,18 @@ class FileDefinition
       return "\{ \"type\" : \"conversion error\" \}"
     end
   end
+  
+  def marshal_dump
+    {'path' => path, 'bytes' => bytes, 'mime_id' => mime_id, 'magic_id' => magic_id}
+  end
+
+  def marshal_load(data)
+    self.path = data['path']
+    self.bytes = data['bytes']
+    self.file_list = data['mime_id']
+    self.file_count = data['magic_id']
+  end
+  
 end
 
 class DirectoryDefinition
@@ -147,7 +168,7 @@ class DirectoryDefinition
   
   def initialize(path, size, file_list)
     @path, @bytes, @file_list = path, size, file_list, @file_count = 0, @children = []
-    puts "processing dir:  #{@path}"
+    puts "processing #{@path}/*"
   end
   
   def to_json()
@@ -168,6 +189,22 @@ class DirectoryDefinition
       return "\{ \"type\" : \"conversion error\" \}"
     end
   end
+  
+  def marshal_dump
+    {'path' => path, 'bytes' => bytes, 'file_list' => file_list, 'file_count' => file_count}
+  end
+
+  def marshal_load(data)
+    self.path = data['path']
+    self.bytes = data['bytes']
+    self.file_list = data['file_list']
+    self.file_count = data['file_count']
+  end
+end
+
+# stuff like .app, .bundle, .mbox etc.
+def parse_pseudofiles(file_path)
+
 end
 
 #returns DirectoryDefinition object
@@ -178,13 +215,13 @@ def parse(folder_path)
   begin
     Pathname.new(folder_path).children.each { |f| 
       file = f.to_s.encode("UTF-8")
-      if File.directory?(file) && File.extname(file) != '.app'
+      if $IGNORE_FILES.include?(File.basename(file))
+        # do nothing
+      elsif File.directory?(file) && File.extname(file) != '.app'
       #if File.directory?(file)
         sub_folder = parse(file)
         curr_dir.file_list << sub_folder
         curr_dir.bytes += sub_folder.bytes
-      elsif $IGNORE_FILES.include?(File.basename(file))
-        # do nothing
       else
         sub_file = FileDefinition.new(file)
         curr_dir.bytes += sub_file.bytes
@@ -192,7 +229,7 @@ def parse(folder_path)
       end
     }
   rescue
-    puts "permission denied, skipping #{curr_dir}"
+    puts "permission denied: #{curr_dir}"
   end
   return curr_dir
 end
@@ -210,23 +247,35 @@ $broken_paths = []
 $magic_tab = LookupTable.new # magic file descriptions
 $mime_tab = LookupTable.new
 
-main_dir = parse(main_path)
-size = main_dir.bytes
+fs_tree = parse(main_path)
+size = fs_tree.bytes
 puts("directory info:")
-puts("path: #{main_dir.path}")
+puts("path: #{fs_tree.path}")
 puts("size: #{get_size_string(size)} (#{size} Bytes)")
-puts("files: #{main_dir.file_list.length}")
+puts("files: #{fs_tree.file_list.length}")
 
+puts "writing marshalled objects"
+File.open('fs_tree.out', 'w') {|f| f.write(Marshal.dump(fs_tree)) }
+File.open('magic_tab.out', 'w') {|f| f.write(Marshal.dump($magic_tab)) }
+File.open('mime_tab.out', 'w') {|f| f.write(Marshal.dump($mime_tab)) }
 
+File.open('fs_tree.yaml', 'w') {|f| f.write(YAML.dump(fs_tree)) }
+File.open('magic_tab.yaml', 'w') {|f| f.write(YAML.dump($magic_tab)) }
+File.open('mime_tab.yaml', 'w') {|f| f.write(YAML.dump($mime_tab)) }
 
-#json_str = main_dir.to_json()
-json_str = "\{ \"magic_table\" : #{$magic_tab.to_json}, \"mime_table\" : #{$mime_tab.to_json}, \"file_structure\" : #{main_dir.to_json} \}"
+#json_str = fs_tree.to_json()
+json_str = "\{ \"magic_table\" : #{$magic_tab.to_json}, \"mime_table\" : #{$mime_tab.to_json}, \"file_structure\" : #{fs_tree.to_json} \}"
 json_data = JSON.parse(json_str, :max_nesting => 100)
 yml_data = YAML::dump(json_data)
 
 puts "writing JSON to inventory.json" 
 json_file = File.open("inventory.json", 'w')
-json_file.write(JSON.pretty_generate(json_data)) 
+begin
+  json_file.write(JSON.pretty_generate(json_data)) 
+rescue JSON::ParserError
+  puts "JSON parse error - writing erroneous dump"
+  json_file.write(json_data) 
+end
 
 puts "writing YAML to inventory.yaml" 
 yml_file = File.open("inventory.yaml", 'w')
