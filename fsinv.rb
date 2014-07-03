@@ -5,7 +5,7 @@ require 'mime/types'
 require 'filemagic'
 require 'json'
 require 'yaml'
-require 'active_support/all' # to get to_xml()
+#require 'active_support/all' # to get to_xml()
 require 'pathname'
 
 # use these if you find a KB to be 2^10 bits
@@ -54,29 +54,42 @@ class LookupTable
   end  
   
   def contains?(descr)
-    return @descr_map.has_value?(descr)
+    if descr == ""
+      return false
+    else
+      return @descr_map.has_value?(descr)
+    end
   end
   
   def add(descr)
-    @descr_map[idcursor] = descr
-    @idcursor += 1
+    if descr != ""
+      @descr_map[idcursor] = descr
+      @idcursor += 1
+    end
   end
   
   def getid(descr)
-    return @descr_map.key(descr)
+    if descr == ""
+      return 0
+    else
+      return @descr_map.key(descr)
+    end
   end
   
   def getdescr(id)
     return @descr_map[id]
   end
   
-  def to_json()
-    #descr_arr = []
-    #@descr_map.each { | id, descr | 
-    #  descr_arr << "\{ \"id\" : #{id}, \"description\" : \"#{descr}\" \}"
-      #}
-    #return "[ #{descr_arr.join(", ")} ]"
-    return descr_map.to_json
+  def as_json(options = { })
+    table_arr = []
+    @descr_map.each { | id, descr | 
+      table_arr << {"id" => id, "description" => descr}
+    }
+    return table_arr
+  end
+  
+  def to_json(*a)
+    as_json.to_json(*a)
   end
   
   def marshal_dump
@@ -134,25 +147,33 @@ class FileDefinition
       @magic_id = 0
     end
   end
-    
-  def to_json()
-    begin 
+  
+  def as_json(options = { })
+    p = "path encoding broken"
+    begin
       p = sanitize_string(@path)
-      #json_item = "\{ \"type\" : \"file\", \"path\" : \"#{p}\", \"bytes\" : \"#{@bytes}\", \"mime_id\" : #{@mime_id}, \"magic_id\" : #{@magic_id} \}"
-      #return json_item.force_encoding("utf-8")
-      return {'type' => 'file', 'path' => p, 'bytes' => bytes, 'mime_id' => mime_id, 'magic_id' => magic_id}.to_json
     rescue ArgumentError
       puts "invalid symbol in path: #{@path}"
       $broken_paths << @path
-      return "\{ \"type\" : \"argument error\" \}"
     rescue UndefinedConversionError
-      puts "undefined conversion error"
-      return "\{ \"type\" : \"conversion error\" \}"
+      puts "error with path encoding: undefined conversion error"
     end
+    
+    return {
+      "type" => "file",
+      "path" => p,
+      "bytes" => bytes, 
+      "mime_id" => mime_id, 
+      "magic_id" => magic_id
+    }
+  end
+    
+  def to_json(*a)
+    as_json.to_json(*a)
   end
   
   def marshal_dump
-    {'path' => path, 'bytes' => bytes, 'mime_id' => mime_id, 'magic_id' => magic_id}
+    {"path" => path, "bytes" => bytes, "mime_id" => mime_id, "magic_id" => magic_id}
   end
 
   def marshal_load(data)
@@ -169,31 +190,42 @@ class DirectoryDefinition
   attr_accessor :path,:bytes,:file_list,:file_count
   
   def initialize(path, size, file_list)
-    @path, @bytes, @file_list = path, size, file_list, @file_count = 0, @children = []
+    @path, @bytes, @file_list = path, size, file_list, @file_count = 0
     puts "processing #{@path}/*"
   end
   
-  def to_json()
-    files = []
-    @file_list.each {|f|
-      files << f.to_json()
-    }
+  def as_json(options = { })
+    
+    #files = []
+    #@file_list.each {|f|
+    #  files << f.to_json()
+    #}
+    
+    p = "path encoding broken"
     begin 
       p = sanitize_string(@path)
-      json_item = "\{ \"type\" : \"directory\", \"path\" : \"#{p}\", \"bytes\" : \"#{@bytes}\", \"files\" : [ #{files.join(", ")} ] \}"
-      return json_item.force_encoding("utf-8")
     rescue ArgumentError
       puts "invalid symbol in path: #{@path}"
       $broken_paths << @path
-      return "\{ \"type\" : \"argument error\" \}"
     rescue UndefinedConversionError
-      puts "undefined conversion error"
-      return "\{ \"type\" : \"conversion error\" \}"
+      puts "error with path encoding: undefined conversion error"
     end
+    
+    return {
+      "type" => "directory",
+      "path" => p, 
+      "bytes" => bytes, 
+      "file_count" => file_count,
+      "file_list" => file_list
+    }
+  end
+  
+  def to_json(*a)
+    as_json.to_json(*a)
   end
   
   def marshal_dump
-    {'path' => path, 'bytes' => bytes, 'file_list' => file_list, 'file_count' => file_count}
+    return {'path' => path, 'bytes' => bytes, 'file_list' => file_list, 'file_count' => file_count}
   end
 
   def marshal_load(data)
@@ -265,15 +297,22 @@ File.open('tree-dump.yaml', 'w') {|f| f.write(YAML.dump(fs_tree)) }
 File.open('magictab-dump.yaml', 'w') {|f| f.write(YAML.dump($magic_tab)) }
 File.open('mimetab-dump.yaml', 'w') {|f| f.write(YAML.dump($mime_tab)) }
 
-#json_str = fs_tree.to_json()
-json_str = "\{ \"magic_table\" : #{$magic_tab.to_json}, \"mime_table\" : #{$mime_tab.to_json}, \"file_structure\" : #{fs_tree.to_json} \}"
-json_data = JSON.parse(json_str, :max_nesting => 100)
+#json_str = "\{ \"magic_table\" : #{$magic_tab.to_json}, \"mime_table\" : #{$mime_tab.to_json}, \"file_structure\" : #{fs_tree.to_json} \}"
+#json_data = JSON.parse(json_str, :max_nesting => 100)
+
+structure_map = { "magic_table" => $magic_tab, "mime_table" => $mime_tab, "file_structure" => fs_tree }
+#structure_map = "\{ \"magic_table\" : #{$magic_tab.to_json}, \"mime_table\" : #{$mime_tab.to_json}, \"file_structure\" : #{fs_tree.to_json} }"
+json_data = JSON.parse(structure_map.to_json, :max_nesting => 100)
+json_data = JSON.pretty_generate(json_data) 
+#puts json_data
+
 yml_data = YAML::dump(json_data)
 
 puts "writing JSON to inventory.json" 
 json_file = File.open("inventory.json", 'w')
 begin
-  json_file.write(JSON.pretty_generate(json_data)) 
+  #json_file.write(JSON.pretty_generate(json_data)) 
+  json_file.write(json_data) 
 rescue JSON::ParserError
   puts "JSON parse error - writing erroneous dump"
   json_file.write(json_data) 
