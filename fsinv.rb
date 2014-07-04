@@ -21,7 +21,7 @@ $BYTES_IN_GB = 10**9
 $BYTES_IN_TB = 10**12
 
 $IGNORE_FILES = ['.AppleDouble','.Parent','.DS_Store','Thumbs.db','__MACOSX']
-$PSEUDE_FILES = ['.app', '.bundle', '.mbox']
+$PSEUDO_FILES = ['.app', '.bundle', '.mbox']
 
 def sanitize_string(string)
   string = string.encode("UTF-16BE", :invalid=>:replace, :undef => :replace, :replace=>"?").encode("UTF-8")
@@ -222,58 +222,41 @@ class DirectoryDefinition
   end
 end
 
-# stuff like .app, .bundle, .mbox etc.
-def parse_pseudofile(pseudo_path)
-  pseudo_file = DirectoryDefinition.new(pseudo_path, 0, [])
-  begin
-    Pathname.new(pseudo_file).children.each { |f| 
-      file = f.to_s.encode("UTF-8")
-      if $IGNORE_FILES.include?(File.basename(file))
-        # do nothing
-      elsif File.directory?(file) 
-        sub_folder = pseudo_file(file)
-        pseudo_file.bytes += sub_folder.bytes
-      else
-        sub_file = FileDefinition.new(file, false)
-        pseudo_file.bytes += sub_file.bytes
-      end
-    }
-  rescue
-    puts "permission denied: #{curr_dir}"
-  end
-  return pseudo_file
-end
+
 
 #returns DirectoryDefinition object
-def parse(folder_path)
+def parse(folder_path, pseudofile = false)
   
+  if $PSEUDO_FILES.include?(File.extname(folder_path)) # stuff like .app, .bundle, .mbox etc.
+    puts "processing pseudofile #{folder_path}"
+    pseudofile = true
+  else
+    if pseudofile == false
+      puts "processing #{folder_path}/*"
+    end
+  end
   curr_dir = DirectoryDefinition.new(folder_path, 0, [])
-  
   begin
     Pathname.new(folder_path).children.each { |f| 
       file = f.to_s.encode("UTF-8")
       if $IGNORE_FILES.include?(File.basename(file))
         # do nothing
-      elsif $PSEUDE_FILES.include?(File.extname(file))
-        puts "processing #{file}"
-        pseudo_file = parse_pseudofile(file)
-        curr_dir.bytes += pseudo_file.bytes
       elsif File.directory?(file) 
-        puts "processing #{file}/*"
-        sub_folder = parse(file)
-        curr_dir.file_list << sub_folder
+        sub_folder = parse(file, pseudofile)
         curr_dir.bytes += sub_folder.bytes
-        curr_dir.item_count += sub_folder.item_count
+        curr_dir.file_list << sub_folder unless pseudofile
+        curr_dir.item_count += sub_folder.item_count unless pseudofile
       else
-        sub_file = FileDefinition.new(file)
+        sub_file = FileDefinition.new(file, !pseudofile)
         curr_dir.bytes += sub_file.bytes
-        curr_dir.file_list << sub_file
-        curr_dir.item_count += 1
+        curr_dir.file_list << sub_file unless pseudofile
+        curr_dir.item_count += 1 unless pseudofile
       end
     }
   rescue
     puts "permission denied: #{curr_dir}"
   end
+
   return curr_dir
 end
 
