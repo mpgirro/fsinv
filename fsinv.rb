@@ -9,10 +9,10 @@ require 'active_support/all' # to get to_xml()
 require 'pathname'
 
 # use these if you find a KB to be 2^10 bits
-#$BYTES_IN_KiB = 2**10
-#$BYTES_IN_MiB = 2**20
-#$BYTES_IN_GiB = 2**30
-#$BYTES_IN_TiB = 2**40
+#$BYTES_IN_KB = 2**10
+#$BYTES_IN_MB = 2**20
+#$BYTES_IN_GB = 2**30
+#$BYTES_IN_TB = 2**40
 
 # these define a KB as 1000 bits
 $BYTES_IN_KB = 10**3
@@ -31,17 +31,11 @@ def sanitize_string(string)
 end
 
 def get_size_string(bytes)
-  if bytes > $BYTES_IN_TB
-    return "%f TB" % (bytes.to_f / $BYTES_IN_TB)
-  elsif bytes > $BYTES_IN_GB
-    return "%f GB" % (bytes.to_f / $BYTES_IN_GB)
-  elsif bytes > $BYTES_IN_MB
-    return "%f MB" % (bytes.to_f / $BYTES_IN_MB)
-  elsif bytes > $BYTES_IN_KB
-    return "%f KB" % (bytes.to_f / $BYTES_IN_KB)
-  else
-    return "#{bytes} B"
-  end
+  return "%f TB" % (bytes.to_f / $BYTES_IN_TB) if bytes > $BYTES_IN_TB
+  return "%f GB" % (bytes.to_f / $BYTES_IN_GB) if bytes > $BYTES_IN_GB
+  return "%f MB" % (bytes.to_f / $BYTES_IN_MB) if bytes > $BYTES_IN_MB
+  return "%f KB" % (bytes.to_f / $BYTES_IN_KB) if bytes > $BYTES_IN_KB
+  return "#{bytes} B"
 end
 
 class LookupTable
