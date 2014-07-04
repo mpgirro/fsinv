@@ -1,6 +1,8 @@
 #!/usr/bin/env ruby
 # encoding: utf-8
 
+# author: Maximilian Irro <max@disposia.org>, 2014
+
 require 'mime/types'
 require 'filemagic'
 require 'json'
@@ -32,10 +34,10 @@ def sanitize_string(string)
 end
 
 def get_size_string(bytes)
-  return "%f TB" % (bytes.to_f / BYTES_IN_TB) if bytes > BYTES_IN_TB
-  return "%f GB" % (bytes.to_f / BYTES_IN_GB) if bytes > BYTES_IN_GB
-  return "%f MB" % (bytes.to_f / BYTES_IN_MB) if bytes > BYTES_IN_MB
-  return "%f KB" % (bytes.to_f / BYTES_IN_KB) if bytes > BYTES_IN_KB
+  return "%.3f TB" % (bytes.to_f / BYTES_IN_TB) if bytes > BYTES_IN_TB
+  return "%.3f GB" % (bytes.to_f / BYTES_IN_GB) if bytes > BYTES_IN_GB
+  return "%.3f MB" % (bytes.to_f / BYTES_IN_MB) if bytes > BYTES_IN_MB
+  return "%.3f KB" % (bytes.to_f / BYTES_IN_KB) if bytes > BYTES_IN_KB
   return "#{bytes} B"
 end
 
@@ -78,9 +80,9 @@ class LookupTable
   
   def as_json(options = { })
     table_arr = []
-    @descr_map.each { | id, descr | 
+    @descr_map.each do | id, descr | 
       table_arr << {"id" => id, "description" => descr}
-    }
+    end
     return table_arr
   end
   
@@ -109,16 +111,14 @@ class FileDefinition
     begin
       @bytes = File.size(@path)
     rescue 
-      puts("exception getting size for file: #{path}")
+      puts "error: exception getting size for file #{path}" unless $options[:silent]
     end
     
     if typecheck
       begin
         #@mime = `file -b --mime #{path}`
         description = MIME::Types.type_for(@path).join(', ')
-        if !$mime_tab.contains?(description)
-          $mime_tab.add(description)
-        end
+        $mime_tab.add(description) unless $mime_tab.contains?(description)
         @mime_id = $mime_tab.getid(description)
       rescue ArgumentError # if this happens you should definitly repair some file names
         @mime_id = 0
@@ -126,12 +126,10 @@ class FileDefinition
     
       begin 
         description = sanitize_string($fmagic.file(@path))
-        if !$magic_tab.contains?(description)
-          $magic_tab.add(description)
-        end
+        $magic_tab.add(description) unless $magic_tab.contains?(description)
         @magic_id = $magic_tab.getid(description)
       rescue
-        puts "file magic information unavailable"
+        puts "error: file magic information unavailable" unless $options[:silent]
         @magic_id = 0
       end
     else
@@ -141,15 +139,17 @@ class FileDefinition
   end
   
   def as_json(options = { })
-    p = "path encoding broken"
-    begin
-      p = sanitize_string(@path)
-    rescue ArgumentError
-      puts "invalid symbol in path: #{@path}"
-      $broken_paths << @path
-    rescue UndefinedConversionError
-      puts "error with path encoding: undefined conversion error"
-    end
+    #p = "path encoding broken"
+
+    #begin
+    #  p = sanitize_string(@path)
+    #rescue ArgumentError
+    #  puts "invalid symbol in path: #{@path}"
+    #  $broken_paths << @path
+    #rescue UndefinedConversionError
+    #  puts "error with path encoding: undefined conversion error"
+    #end
+    p = sanitize_string(@path) rescue "path encoding broken" # there can be ArgumentError and UndefinedConversionError
     return {"type" => "file","path" => p,"bytes" => bytes, "mime_id" => mime_id, "magic_id" => magic_id}
   end
     
@@ -179,15 +179,16 @@ class DirectoryDefinition
   end
   
   def as_json(options = { })
-    p = "path encoding broken"
-    begin 
-      p = sanitize_string(@path)
-    rescue ArgumentError
-      puts "invalid symbol in path: #{@path}"
-      $broken_paths << @path
-    rescue UndefinedConversionError
-      puts "error with path encoding: undefined conversion error"
-    end
+    #p = "path encoding broken"
+    #begin 
+    #  p = sanitize_string(@path)
+    #rescue ArgumentError
+    #  puts "invalid symbol in path: #{@path}"
+    #  $broken_paths << @path
+    #rescue UndefinedConversionError
+    #  puts "error with path encoding: undefined conversion error"
+    #end
+    p = sanitize_string(@path) rescue "path encoding broken" # there can be ArgumentError and UndefinedConversionError
     return {"type" => "directory", "path" => p, "bytes" => bytes, "file_count" => file_count, "file_list" => file_list, "item_count" => item_count}
   end
   
@@ -214,12 +215,10 @@ end # DirectoryDefinition
 def parse(folder_path, pseudofile = false)
   
   if $PSEUDO_FILES.include?(File.extname(folder_path)) # stuff like .app, .bundle, .mbox etc.
-    puts "processing pseudofile #{folder_path}" unless pseudofile
+    puts "processing pseudofile #{folder_path}" unless pseudofile || $options[:silent]
     pseudofile = true
   else
-    if pseudofile == false
-      puts "processing #{folder_path}/*"
-    end
+    puts "processing #{folder_path}/*" unless pseudofile || $options[:silent]
   end
   
   curr_dir = DirectoryDefinition.new(folder_path, 0, [])
@@ -242,7 +241,7 @@ def parse(folder_path, pseudofile = false)
       end
     }
   rescue
-    puts "permission denied: #{curr_dir}"
+    puts "permission denied: #{curr_dir}" unless $options[:silent]
   end
 
   return curr_dir
@@ -286,130 +285,142 @@ class FsInventory
   
 end
 
-$DEFAULT_NAME = "inventory"
+if __FILE__ == $0
 
-options = {}
-OptionParser.new do |opts|
-  opts.banner = "Usage: fsinv.rb basepath [options]"
-  opts.separator ""
-  opts.separator "Specific options:"
+  DEFAULT_NAME = "inventory"
+  USAGE_STR = "Usage: fsinv.rb basepath [$options]"
 
-  opts.on("-a", "--all", "Save in all formats to the default destination. Equal to -bjqxy. Use -n to change the file names") do |all_flag|
-    options[:binary] = all_flag
-    options[:json] = all_flag
-    options[:sql] = true
-    options[:xml]  = all_flag
-    options[:yaml] = all_flag
-  end
+  $options = {}
+  OptionParser.new do |opts|
+    opts.banner = USAGE_STR
+    opts.separator ""
+    opts.separator "Specific options:"
+
+    opts.on("-a", "--all", "Save in all formats to the default destinations. Equal to -bjqxy. Use -n to change the file names") do |all_flag|
+      $options[:binary]  = true
+      $options[:json]    = true
+      $options[:sql]     = true
+      $options[:xml]     = true
+      $options[:yaml]    = true
+    end
   
-  opts.on("-b", "--binary", "Dump iventory data stuctures in binary format") do |binary_file|
-    options[:binary] = true
-    options[:binary_file] = binary_file
-  end
+    opts.on("-b", "--binary [FILE]", "Dump iventory data stuctures in binary format. Default destination is #{DEFAULT_NAME}.bin") do |binary_file|
+      $options[:binary] = true
+      $options[:binary_file] = binary_file
+    end
   
-  opts.on_tail("-h", "--help", "Show this message") do
-    puts opts
+    opts.on_tail("-h", "--help", "Show this message") do
+      puts opts
+      exit
+    end
+  
+    opts.on("-j", "--json [FILE]", "Save inventory in JSON file format. Default destination is #{DEFAULT_NAME}.json") do |json_file|
+      $options[:json] = true
+      $options[:json_file] = json_file
+    end
+  
+    opts.on("-n", "--name INV_NAME", "Name of the inventory. This will change the name of the output files. Default is '#{DEFAULT_NAME}'") do |name|
+      $options[:name_flag] = true
+      $options[:inv_name] = name
+    end
+  
+    opts.on("-p", "--print FORMAT", [:json, :yaml, :xml], "Print a format to stdout (json|yaml|xml)") do |format|
+      $options[:print] = true
+      $options[:print_format] = format
+    end
+  
+    opts.on("-q", "--sql [FILE]", "Save inventory as SQLite database. Default destination is #{DEFAULT_NAME}.db") do |sql_file|
+      $options[:sql] = true
+      $options[:sql_file] = sql_file 
+    end
+  
+    opts.on("-s", "--silent", "Run in silent mode. No output or non-critical error messages will be printed") do |s|
+      $options[:silent] = s
+    end
+  
+    opts.on("-v", "--verbose", "Run verbosely. This will output processed filenames and error messages too") do |v|
+      $options[:verbose] = v
+    end
+  
+    opts.on("-x", "--xml [FILE]", "Save inventory in XML file format. Default destination is #{DEFAULT_NAME}.xml") do |xml_file|
+      $options[:xml] = true
+      $options[:xml_file] = xml_file 
+    end
+  
+    opts.on("-y", "--yaml [FILE]", "Save inventory in YAML file format. Default destination is #{DEFAULT_NAME}.yaml") do |yaml_file|
+      $options[:yaml] = true
+      $options[:yaml_file] = yaml_file
+    end
+  end.parse! # do the parsing. do it now!
+
+  p $options
+  p ARGV
+
+  if ARGV[0].nil? 
+    puts "No basepath provided"
+    puts USAGE_STR
+    exit
+  elsif !File.directory?(ARGV[0])
+    puts "Not a directory"
+    puts USAGE_STR
     exit
   end
-  
-  opts.on("-j", "--json [FILE]", "Save inventory in JSON file format. Default destination is #{$DEFAULT_NAME}.json") do |json_file|
-    options[:json] = true
-    options[:json_file] = json_file
+
+  main_path = ARGV[0]
+
+  $fmagic = FileMagic.new 
+  $magic_tab = LookupTable.new # magic file descriptions
+  $mime_tab = LookupTable.new
+
+  fs_tree = parse(main_path)
+
+  inventory = FsInventory.new($magic_tab, $mime_tab, fs_tree)
+
+
+  size = inventory.size
+  puts("directory info:")
+  puts("path: #{fs_tree.path}")
+  puts("size: #{get_size_string(size)} (#{size} Bytes)")
+  puts("files: #{fs_tree.file_list.length}")
+
+  puts "writing binary dump to inventory.bin"
+  File.open('inventory-dump.bin', 'wb') {|f| f.write(Marshal.dump(inventory)) }
+  File.open('inventory-dump.yaml', 'w') {|f| f.write(YAML.dump(inventory)) }
+
+  json_data = JSON.parse(inventory.to_json, :max_nesting => 100)
+  json_data = JSON.pretty_generate(json_data, :max_nesting => 100) 
+
+  # this is the default output
+  unless ($options[:binary]||$options[:sql]||$options[:xml]||$options[:yaml]) && $options[:json].nil?
+    $options[:json_file] = "#{DEFAULT_NAME}.json" if $options[:json_file].nil?
+    puts "writing JSON to #{$options[:json_file]}" unless $options[:silent]
+    begin 
+      file = File.open($options[:json_file], 'w') 
+      file.write(json_data)
+    rescue
+      puts "error writing JSON file"
+    ensure
+      file.close unless file.nil?
+    end
   end
-  
-  opts.on("-n", "--name INV_NAME", "Name of the inventory. This will change the name of the output files. Default is '#{$DEFAULT_NAME}'") do |name|
-    options[:name_flag] = true
-    options[:inv_name] = name
+
+  if $options[:yaml]
+    $options[:yaml_file] = "#{DEFAULT_NAME}.yaml" if $options[:yaml_file].nil?
+    puts "writing YAML to #{$options[:yaml_file]}" unless $options[:silent]
+    begin
+      yml_data = YAML::dump(inventory)
+      file = File.open($options[:yaml_file], 'w') 
+      file.write(yml_data)
+    rescue
+      puts "error writing YAML file"
+    ensure
+      file.close unless file.nil?
+    end
   end
-  
-  opts.on("-p", "--print FORMAT", [:json, :yaml, :xml], "Print a format to stdout (json|yaml|xml)") do |format|
-    options[:print] = true
-    options[:print_format] = format
-  end
-  
-  opts.on("-q", "--sql [FILE]", "Save inventory as SQLite database. Default destination is #{$DEFAULT_NAME}.db") do |sql_file|
-    options[:sql] = true
-    options[:sql_file] = sql_file 
-  end
-  
-  opts.on("-s", "--silent", "Run in silent mode. No output or non-critical error messages will be printed") do |s|
-    options[:silent] = s
-  end
-  
-  opts.on("-v", "--verbose", "Run verbosely. This will output processed filenames and error messages too") do |v|
-    options[:verbose] = v
-  end
-  
-  opts.on("-x", "--xml [FILE]", "Save inventory in XML file format. Default destination is #{$DEFAULT_NAME}.xml") do |xml_file|
-    options[:xml] = true
-    options[:xml_file] = xml_file 
-  end
-  
-  opts.on("-y", "--yaml [FILE]", "Save inventory in YAML file format. Default destination is #{$DEFAULT_NAME}.yaml") do |yaml_file|
-    options[:yaml] = true
-    options[:yaml_file] = yaml_file
-  end
-end.parse! # do the parsing. do it now!
-
-p options
-p ARGV
 
 
+  puts "writing XML to inventory.xml" unless $options[:silent]
+  xml_file = File.open("inventory.xml", 'w')
+  xml_file.write(inventory.to_xml)
 
-dir_path = ''
-if ARGV[0].nil? || !File.directory?(ARGV[0])
-  puts "No basepath provided"
-  puts opts.banner
-  exit
-end
-
-main_path = ARGV[0]
-
-$fmagic = FileMagic.new 
-$broken_paths = []
-$magic_tab = LookupTable.new # magic file descriptions
-$mime_tab = LookupTable.new
-
-fs_tree = parse(main_path)
-
-inventory = FsInventory.new($magic_tab, $mime_tab, fs_tree)
-
-
-size = inventory.size
-puts("directory info:")
-puts("path: #{fs_tree.path}")
-puts("size: #{get_size_string(size)} (#{size} Bytes)")
-puts("files: #{fs_tree.file_list.length}")
-
-puts "writing marshalled objects"
-File.open('inventory-dump.bin', 'wb') {|f| f.write(Marshal.dump(inventory)) }
-File.open('inventory-dump.yaml', 'w') {|f| f.write(YAML.dump(inventory)) }
-
-json_data = JSON.parse(inventory.to_json, :max_nesting => 100)
-json_data = JSON.pretty_generate(json_data, :max_nesting => 100) 
-
-yml_data = YAML::dump(json_data)
-
-puts "writing JSON to inventory.json" 
-json_file = File.open("inventory.json", 'w')
-begin
-  json_file.write(json_data) 
-rescue JSON::ParserError
-  puts "JSON parse error - writing erroneous dump"
-  json_file.write(json_data) 
-end
-
-puts "writing YAML to inventory.yaml" 
-yml_file = File.open("inventory.yaml", 'w')
-yml_file.write(yml_data)
-
-puts "writing XML to inventory.xml" 
-xml_file = File.open("inventory.xml", 'w')
-xml_file.write(json_data.to_xml)
-
-if $broken_paths.length > 0
-  puts "writing broken links to ./broken_paths.txt"
-  File.open("broken_links.txt", 'w') {|f| 
-    f.write($broken_paths.join("\n")) 
-  }
 end
