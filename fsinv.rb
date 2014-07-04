@@ -21,6 +21,7 @@ $BYTES_IN_GB = 10**9
 $BYTES_IN_TB = 10**12
 
 $IGNORE_FILES = ['.AppleDouble','.Parent','.DS_Store','Thumbs.db','__MACOSX']
+$PSEUDE_FILES = ['.app', '.bundle', '.mbox']
 
 def sanitize_string(string)
   string = string.encode("UTF-16BE", :invalid=>:replace, :undef => :replace, :replace=>"?").encode("UTF-8")
@@ -222,8 +223,25 @@ class DirectoryDefinition
 end
 
 # stuff like .app, .bundle, .mbox etc.
-def parse_pseudofiles(file_path)
-
+def parse_pseudofile(path)
+  pseudo_file = DirectoryDefinition.new(path, 0, [])
+  begin
+    Pathname.new(pseudo_file).children.each { |f| 
+      file = f.to_s.encode("UTF-8")
+      if $IGNORE_FILES.include?(File.basename(file))
+        # do nothing
+      elsif File.directory?(file) 
+        sub_folder = pseudo_file(file)
+        curr_dir.bytes += sub_folder.bytes
+      else
+        sub_file = FileDefinition.new(file)
+        curr_dir.bytes += sub_file.bytes
+      end
+    }
+  rescue
+    puts "permission denied: #{curr_dir}"
+  end
+  return pseudo_file
 end
 
 #returns DirectoryDefinition object
@@ -236,8 +254,10 @@ def parse(folder_path)
       file = f.to_s.encode("UTF-8")
       if $IGNORE_FILES.include?(File.basename(file))
         # do nothing
-      elsif File.directory?(file) && File.extname(file) != '.app'
-      #if File.directory?(file)
+      elsif $PSEUDE_FILES.include?(File.extname(file))
+        pseudo_file = parse_pseudofile(file)
+        curr_dir.bytes += pseudo_file.bytes
+      elsif File.directory?(file) 
         sub_folder = parse(file)
         curr_dir.file_list << sub_folder
         curr_dir.bytes += sub_folder.bytes
@@ -281,6 +301,16 @@ class FsInventory
     as_json.to_json(*a)
   end
   
+  def marshal_dump
+    return {'magic_tab' => magic_tab, 'mime_tab' => mime_tab, 'file_structure' => file_structure}
+  end
+
+  def marshal_load(data)
+    self.magic_tab = data['magic_tab']
+    self.mime_tab = data['mime_tab']
+    self.file_structure = data['file_structure']
+  end
+  
 end
 
 dir_path = ''
@@ -308,13 +338,15 @@ puts("size: #{get_size_string(size)} (#{size} Bytes)")
 puts("files: #{fs_tree.file_list.length}")
 
 puts "writing marshalled objects"
-File.open('filestructure-dump.bin', 'wb') {|f| f.write(Marshal.dump(inventory.file_structure)) }
-File.open('magictab-dump.bin', 'wb') {|f| f.write(Marshal.dump(inventory.magic_tab)) }
-File.open('mimetab-dump.bin', 'wb') {|f| f.write(Marshal.dump(inventory.mime_tab)) }
+File.open('inventory-dump.bin', 'wb') {|f| f.write(Marshal.dump(inventory)) }
+#File.open('filestructure-dump.bin', 'wb') {|f| f.write(Marshal.dump(inventory.file_structure)) }
+#File.open('magictab-dump.bin', 'wb') {|f| f.write(Marshal.dump(inventory.magic_tab)) }
+#File.open('mimetab-dump.bin', 'wb') {|f| f.write(Marshal.dump(inventory.mime_tab)) }
 
-File.open('filestructure-dump.yaml', 'w') {|f| f.write(YAML.dump(inventory.file_structure)) }
-File.open('magictab-dump.yaml', 'w') {|f| f.write(YAML.dump(inventory.magic_tab)) }
-File.open('mimetab-dump.yaml', 'w') {|f| f.write(YAML.dump(inventory.mime_tab)) }
+File.open('inventory-dump.yaml', 'w') {|f| f.write(YAML.dump(inventory)) }
+#File.open('filestructure-dump.yaml', 'w') {|f| f.write(YAML.dump(inventory.file_structure)) }
+#File.open('magictab-dump.yaml', 'w') {|f| f.write(YAML.dump(inventory.magic_tab)) }
+#File.open('mimetab-dump.yaml', 'w') {|f| f.write(YAML.dump(inventory.mime_tab)) }
 
 #structure_map = { "magic_table" => $magic_tab, "mime_table" => $mime_tab, "file_structure" => fs_tree }
 
