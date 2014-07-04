@@ -109,10 +109,7 @@ class FileDefinition
   attr_accessor :bytes,:path,:mime_id,:magic_id
   
   def initialize(path, typecheck = true)
-    
     @path = path
-    #puts "processing file: #{@path}"
-    
     @bytes = 0
     begin
       @bytes = File.size(@path)
@@ -123,7 +120,6 @@ class FileDefinition
     if typecheck
       begin
         #@mime = `file -b --mime #{path}`
-        #@mime = MIME::Types.type_for(@path)
         description = MIME::Types.type_for(@path).join(', ')
         if !$mime_tab.contains?(description)
           $mime_tab.add(description)
@@ -138,7 +134,6 @@ class FileDefinition
         if !$magic_tab.contains?(description)
           $magic_tab.add(description)
         end
-        #@description = magic_descr
         @magic_id = $magic_tab.getid(description)
       rescue
         puts "file magic information unavailable"
@@ -189,10 +184,6 @@ class DirectoryDefinition
   end
   
   def as_json(options = { })
-    #files = []
-    #@file_list.each {|f|
-    #  files << f.to_json()
-    #}
     p = "path encoding broken"
     begin 
       p = sanitize_string(@path)
@@ -324,27 +315,16 @@ puts("files: #{fs_tree.file_list.length}")
 
 puts "writing marshalled objects"
 File.open('inventory-dump.bin', 'wb') {|f| f.write(Marshal.dump(inventory)) }
-#File.open('filestructure-dump.bin', 'wb') {|f| f.write(Marshal.dump(inventory.file_structure)) }
-#File.open('magictab-dump.bin', 'wb') {|f| f.write(Marshal.dump(inventory.magic_tab)) }
-#File.open('mimetab-dump.bin', 'wb') {|f| f.write(Marshal.dump(inventory.mime_tab)) }
-
 File.open('inventory-dump.yaml', 'w') {|f| f.write(YAML.dump(inventory)) }
-#File.open('filestructure-dump.yaml', 'w') {|f| f.write(YAML.dump(inventory.file_structure)) }
-#File.open('magictab-dump.yaml', 'w') {|f| f.write(YAML.dump(inventory.magic_tab)) }
-#File.open('mimetab-dump.yaml', 'w') {|f| f.write(YAML.dump(inventory.mime_tab)) }
-
-#structure_map = { "magic_table" => $magic_tab, "mime_table" => $mime_tab, "file_structure" => fs_tree }
 
 json_data = JSON.parse(inventory.to_json, :max_nesting => 100)
 json_data = JSON.pretty_generate(json_data, :max_nesting => 100) 
-#puts json_data
 
 yml_data = YAML::dump(json_data)
 
 puts "writing JSON to inventory.json" 
 json_file = File.open("inventory.json", 'w')
 begin
-  #json_file.write(JSON.pretty_generate(json_data)) 
   json_file.write(json_data) 
 rescue JSON::ParserError
   puts "JSON parse error - writing erroneous dump"
@@ -358,10 +338,6 @@ yml_file.write(yml_data)
 puts "writing XML to inventory.xml" 
 xml_file = File.open("inventory.xml", 'w')
 xml_file.write(json_data.to_xml)
-
-#File.open("file_structure.yaml", 'w') {|f| 
-#  yaml_str = "---\n #{$magic_tab.to_yaml} \n---\n "
-#}
 
 if $broken_paths.length > 0
   puts "writing broken links to ./broken_paths.txt"
