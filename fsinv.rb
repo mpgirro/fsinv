@@ -108,43 +108,44 @@ class FileDefinition
   
   attr_accessor :bytes,:path,:mime_id,:magic_id
   
-  def initialize(path, bytes = nil)
+  def initialize(path, typecheck = true)
     
     @path = path
     #puts "processing file: #{@path}"
     
-    if bytes.nil?
-      @bytes = 0
+    @bytes = 0
+    begin
+      @bytes = File.size(@path)
+    rescue 
+      puts("exception getting size for file: #{path}")
+    end
+    
+    if typecheck
       begin
-        @bytes = File.size(@path)
-      rescue Exception => e
-        puts("exception getting size for file: #{path}")
+        #@mime = `file -b --mime #{path}`
+        #@mime = MIME::Types.type_for(@path)
+        description = MIME::Types.type_for(@path).join(', ')
+        if !$mime_tab.contains?(description)
+          $mime_tab.add(description)
+        end
+        @mime_id = $mime_tab.getid(description)
+      rescue ArgumentError # if this happens you should definitly repair some file names
+        @mime_id = 0
+      end
+    
+      begin 
+        description = sanitize_string($fmagic.file(@path))
+        if !$magic_tab.contains?(description)
+          $magic_tab.add(description)
+        end
+        #@description = magic_descr
+        @magic_id = $magic_tab.getid(description)
+      rescue
+        puts "file magic information unavailable"
+        @magic_id = 0
       end
     else
-      @bytes = bytes
-    end
-    
-    begin
-      #@mime = `file -b --mime #{path}`
-      #@mime = MIME::Types.type_for(@path)
-      description = MIME::Types.type_for(@path).join(', ')
-      if !$mime_tab.contains?(description)
-        $mime_tab.add(description)
-      end
-      @mime_id = $mime_tab.getid(description)
-    rescue ArgumentError # if this happens you should definitly repair some file names
       @mime_id = 0
-    end
-    
-    begin 
-      description = sanitize_string($fmagic.file(@path))
-      if !$magic_tab.contains?(description)
-        $magic_tab.add(description)
-      end
-      #@description = magic_descr
-      @magic_id = $magic_tab.getid(description)
-    rescue
-      puts "file magic information unavailable"
       @magic_id = 0
     end
   end
@@ -185,7 +186,6 @@ class DirectoryDefinition
   
   def initialize(path, size, file_list)
     @path, @bytes, @file_list = path, size, file_list, @file_count = 0, @item_count = 1
-    puts "processing #{@path}/*"
   end
   
   def as_json(options = { })
@@ -223,8 +223,8 @@ class DirectoryDefinition
 end
 
 # stuff like .app, .bundle, .mbox etc.
-def parse_pseudofile(path)
-  pseudo_file = DirectoryDefinition.new(path, 0, [])
+def parse_pseudofile(pseudo_path)
+  pseudo_file = DirectoryDefinition.new(pseudo_path, 0, [])
   begin
     Pathname.new(pseudo_file).children.each { |f| 
       file = f.to_s.encode("UTF-8")
@@ -232,10 +232,10 @@ def parse_pseudofile(path)
         # do nothing
       elsif File.directory?(file) 
         sub_folder = pseudo_file(file)
-        curr_dir.bytes += sub_folder.bytes
+        pseudo_file.bytes += sub_folder.bytes
       else
-        sub_file = FileDefinition.new(file)
-        curr_dir.bytes += sub_file.bytes
+        sub_file = FileDefinition.new(file, false)
+        pseudo_file.bytes += sub_file.bytes
       end
     }
   rescue
@@ -255,9 +255,11 @@ def parse(folder_path)
       if $IGNORE_FILES.include?(File.basename(file))
         # do nothing
       elsif $PSEUDE_FILES.include?(File.extname(file))
+        puts "processing #{file}"
         pseudo_file = parse_pseudofile(file)
         curr_dir.bytes += pseudo_file.bytes
       elsif File.directory?(file) 
+        puts "processing #{file}/*"
         sub_folder = parse(file)
         curr_dir.file_list << sub_folder
         curr_dir.bytes += sub_folder.bytes
