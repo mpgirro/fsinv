@@ -21,7 +21,7 @@ $BYTES_IN_GB = 10**9
 $BYTES_IN_TB = 10**12
 
 $IGNORE_FILES = ['.AppleDouble','.Parent','.DS_Store','Thumbs.db','__MACOSX']
-$PSEUDO_FILES = ['.app', '.bundle', '.mbox']
+$PSEUDO_FILES = ['.app', '.bundle', '.mbox', '.plugin']
 
 def sanitize_string(string)
   string = string.encode("UTF-16BE", :invalid=>:replace, :undef => :replace, :replace=>"?").encode("UTF-8")
@@ -219,14 +219,16 @@ end
 def parse(folder_path, pseudofile = false)
   
   if $PSEUDO_FILES.include?(File.extname(folder_path)) # stuff like .app, .bundle, .mbox etc.
-    puts "processing pseudofile #{folder_path}"
+    puts "processing pseudofile #{folder_path}" unless pseudofile
     pseudofile = true
   else
     if pseudofile == false
       puts "processing #{folder_path}/*"
     end
   end
+  
   curr_dir = DirectoryDefinition.new(folder_path, 0, [])
+  
   begin
     Pathname.new(folder_path).children.each { |f| 
       file = f.to_s.encode("UTF-8")
