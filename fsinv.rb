@@ -7,21 +7,22 @@ require 'json'
 require 'yaml'
 require 'active_support/all' # to get to_xml()
 require 'pathname'
+require 'optparse'
 
 # use these if you find a KB to be 2^10 bits
-#$BYTES_IN_KB = 2**10
-#$BYTES_IN_MB = 2**20
-#$BYTES_IN_GB = 2**30
-#$BYTES_IN_TB = 2**40
+#BYTES_IN_KB = 2**10
+#BYTES_IN_MB = 2**20
+#BYTES_IN_GB = 2**30
+#BYTES_IN_TB = 2**40
 
 # these define a KB as 1000 bits
-$BYTES_IN_KB = 10**3
-$BYTES_IN_MB = 10**6
-$BYTES_IN_GB = 10**9
-$BYTES_IN_TB = 10**12
+BYTES_IN_KB = 10**3
+BYTES_IN_MB = 10**6
+BYTES_IN_GB = 10**9
+BYTES_IN_TB = 10**12
 
 $IGNORE_FILES = ['.AppleDouble','.Parent','.DS_Store','Thumbs.db','__MACOSX']
-$PSEUDO_FILES = ['.app', '.bundle', '.mbox', '.plugin']
+$PSEUDO_FILES = ['.app', '.bundle', '.mbox', '.plugin', '.sparsebundle'] # all osx only files
 
 def sanitize_string(string)
   string = string.encode("UTF-16BE", :invalid=>:replace, :undef => :replace, :replace=>"?").encode("UTF-8")
@@ -31,10 +32,10 @@ def sanitize_string(string)
 end
 
 def get_size_string(bytes)
-  return "%f TB" % (bytes.to_f / $BYTES_IN_TB) if bytes > $BYTES_IN_TB
-  return "%f GB" % (bytes.to_f / $BYTES_IN_GB) if bytes > $BYTES_IN_GB
-  return "%f MB" % (bytes.to_f / $BYTES_IN_MB) if bytes > $BYTES_IN_MB
-  return "%f KB" % (bytes.to_f / $BYTES_IN_KB) if bytes > $BYTES_IN_KB
+  return "%f TB" % (bytes.to_f / BYTES_IN_TB) if bytes > BYTES_IN_TB
+  return "%f GB" % (bytes.to_f / BYTES_IN_GB) if bytes > BYTES_IN_GB
+  return "%f MB" % (bytes.to_f / BYTES_IN_MB) if bytes > BYTES_IN_MB
+  return "%f KB" % (bytes.to_f / BYTES_IN_KB) if bytes > BYTES_IN_KB
   return "#{bytes} B"
 end
 
@@ -96,7 +97,7 @@ class LookupTable
     self.idcursor = data['idcursor']
   end
   
-end
+end # LookupTable
 
 class FileDefinition
   
@@ -167,7 +168,7 @@ class FileDefinition
     self.file_count = data['magic_id']
   end
   
-end
+end # FileDefinition
 
 class DirectoryDefinition
   
@@ -205,7 +206,7 @@ class DirectoryDefinition
     self.file_count = data['file_count']
     self.item_count = data['item_count']
   end
-end
+end # DirectoryDefinition
 
 
 
@@ -245,7 +246,7 @@ def parse(folder_path, pseudofile = false)
   end
 
   return curr_dir
-end
+end # parse()
 
 class FsInventory
   
@@ -285,10 +286,81 @@ class FsInventory
   
 end
 
+$DEFAULT_NAME = "inventory"
+
+options = {}
+OptionParser.new do |opts|
+  opts.banner = "Usage: fsinv.rb basepath [options]"
+  opts.separator ""
+  opts.separator "Specific options:"
+
+  opts.on("-a", "--all", "Save in all formats to the default destination. Equal to -bjqxy. Use -n to change the file names") do |all_flag|
+    options[:binary] = all_flag
+    options[:json] = all_flag
+    options[:sql] = true
+    options[:xml]  = all_flag
+    options[:yaml] = all_flag
+  end
+  
+  opts.on("-b", "--binary", "Dump iventory data stuctures in binary format") do |binary_file|
+    options[:binary] = true
+    options[:binary_file] = binary_file
+  end
+  
+  opts.on_tail("-h", "--help", "Show this message") do
+    puts opts
+    exit
+  end
+  
+  opts.on("-j", "--json [FILE]", "Save inventory in JSON file format. Default destination is #{$DEFAULT_NAME}.json") do |json_file|
+    options[:json] = true
+    options[:json_file] = json_file
+  end
+  
+  opts.on("-n", "--name INV_NAME", "Name of the inventory. This will change the name of the output files. Default is '#{$DEFAULT_NAME}'") do |name|
+    options[:name_flag] = true
+    options[:inv_name] = name
+  end
+  
+  opts.on("-p", "--print FORMAT", [:json, :yaml, :xml], "Print a format to stdout (json|yaml|xml)") do |format|
+    options[:print] = true
+    options[:print_format] = format
+  end
+  
+  opts.on("-q", "--sql [FILE]", "Save inventory as SQLite database. Default destination is #{$DEFAULT_NAME}.db") do |sql_file|
+    options[:sql] = true
+    options[:sql_file] = sql_file 
+  end
+  
+  opts.on("-s", "--silent", "Run in silent mode. No output or non-critical error messages will be printed") do |s|
+    options[:silent] = s
+  end
+  
+  opts.on("-v", "--verbose", "Run verbosely. This will output processed filenames and error messages too") do |v|
+    options[:verbose] = v
+  end
+  
+  opts.on("-x", "--xml [FILE]", "Save inventory in XML file format. Default destination is #{$DEFAULT_NAME}.xml") do |xml_file|
+    options[:xml] = true
+    options[:xml_file] = xml_file 
+  end
+  
+  opts.on("-y", "--yaml [FILE]", "Save inventory in YAML file format. Default destination is #{$DEFAULT_NAME}.yaml") do |yaml_file|
+    options[:yaml] = true
+    options[:yaml_file] = yaml_file
+  end
+end.parse! # do the parsing. do it now!
+
+p options
+p ARGV
+
+
+
 dir_path = ''
 if ARGV[0].nil? || !File.directory?(ARGV[0])
-  puts("directory required.")
-  return
+  puts "No basepath provided"
+  puts opts.banner
+  exit
 end
 
 main_path = ARGV[0]
