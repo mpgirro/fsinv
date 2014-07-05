@@ -5,8 +5,6 @@
 
 require 'mime/types'
 require 'filemagic'
-require 'json'
-require 'yaml'
 require 'active_support/all' # to get to_xml()
 require 'pathname'
 require 'optparse'
@@ -24,7 +22,7 @@ BYTES_IN_GB = 10**9
 BYTES_IN_TB = 10**12
 
 $IGNORE_FILES = ['.AppleDouble','.Parent','.DS_Store','Thumbs.db','__MACOSX']
-$PSEUDO_FILES = ['.app', '.bundle', '.mbox', '.plugin', '.sparsebundle'] # all osx only files
+$PSEUDO_FILES = ['.app', '.bundle', '.mbox', '.plugin', '.sparsebundle'] # look like files on osx, are folders in truth
 
 def sanitize_string(string)
   string = string.encode("UTF-16BE", :invalid=>:replace, :undef => :replace, :replace=>"?").encode("UTF-8")
@@ -78,12 +76,16 @@ class LookupTable
     return @descr_map[id]
   end
   
-  def as_json(options = { })
+  def to_a()
     table_arr = []
     @descr_map.each do | id, descr | 
       table_arr << {"id" => id, "description" => descr}
     end
     return table_arr
+  end
+  
+  def as_json(options = { })
+    return to_a
   end
   
   def to_json(*a)
@@ -138,19 +140,13 @@ class FileDefinition
     end
   end
   
-  def as_json(options = { })
-    #p = "path encoding broken"
-
-    #begin
-    #  p = sanitize_string(@path)
-    #rescue ArgumentError
-    #  puts "invalid symbol in path: #{@path}"
-    #  $broken_paths << @path
-    #rescue UndefinedConversionError
-    #  puts "error with path encoding: undefined conversion error"
-    #end
+  def to_hash()
     p = sanitize_string(@path) rescue "path encoding broken" # there can be ArgumentError and UndefinedConversionError
     return {"type" => "file","path" => p,"bytes" => bytes, "mime_id" => mime_id, "magic_id" => magic_id}
+  end
+  
+  def as_json(options = { })
+    return to_hash
   end
     
   def to_json(*a)
@@ -179,21 +175,12 @@ class DirectoryDefinition
   end
   
   def as_json(options = { })
-    #p = "path encoding broken"
-    #begin 
-    #  p = sanitize_string(@path)
-    #rescue ArgumentError
-    #  puts "invalid symbol in path: #{@path}"
-    #  $broken_paths << @path
-    #rescue UndefinedConversionError
-    #  puts "error with path encoding: undefined conversion error"
-    #end
     p = sanitize_string(@path) rescue "path encoding broken" # there can be ArgumentError and UndefinedConversionError
     return {"type" => "directory", "path" => p, "bytes" => bytes, "file_count" => file_count, "file_list" => file_list, "item_count" => item_count}
   end
   
   def to_json(*a)
-    as_json.to_json(*a)
+    return as_json.to_json(*a)
   end
   
   def marshal_dump
@@ -265,8 +252,12 @@ class FsInventory
     return file_structure.bytes
   end
   
-  def as_json(options = { })
+  def to_hash()
     return {"magic_tab" => magic_tab, "mime_tab" => mime_tab, "file_structure" => file_structure}
+  end
+  
+  def as_json(options = { })
+    return to_hash
   end
   
   def to_json(*a)
@@ -274,7 +265,7 @@ class FsInventory
   end
   
   def marshal_dump
-    return {'magic_tab' => magic_tab, 'mime_tab' => mime_tab, 'file_structure' => file_structure}
+    return to_hash
   end
 
   def marshal_load(data)
@@ -283,6 +274,30 @@ class FsInventory
     self.file_structure = data['file_structure']
   end
   
+end
+
+def filestruct_to_xml(xml, treenode)
+  case treenode
+  when DirectoryDefinition
+    xml.directory{
+      xml.path(treenode.path)
+      xml.bytes(treenode.bytes)
+      xml.file_count(treenode.file_count)
+      xml.item_count(treenode.item_count)
+      xml.file_list {
+        treenode.file_list.each do |fileitem|
+          filestruct_to_xml(xml, fileitem)
+        end
+      }
+    }
+  when FileDefinition
+    xml.file{
+      xml.path(treenode.path)
+      xml.bytes(treenode.bytes)
+      xml.mime_id(treenode.mime_id)
+      xml.magic_id(treenode.magic_id)
+    }
+  end 
 end
 
 if __FILE__ == $0
@@ -375,23 +390,21 @@ if __FILE__ == $0
   fs_tree = parse(main_path)
 
   inventory = FsInventory.new($magic_tab, $mime_tab, fs_tree)
-
-
-  size = inventory.size
-  puts("directory info:")
-  puts("path: #{fs_tree.path}")
-  puts("size: #{get_size_string(size)} (#{size} Bytes)")
-  puts("files: #{fs_tree.file_list.length}")
-
-  puts "writing binary dump to inventory.bin"
-  File.open('inventory-dump.bin', 'wb') {|f| f.write(Marshal.dump(inventory)) }
-  File.open('inventory-dump.yaml', 'w') {|f| f.write(YAML.dump(inventory)) }
-
-  json_data = JSON.parse(inventory.to_json, :max_nesting => 100)
-  json_data = JSON.pretty_generate(json_data, :max_nesting => 100) 
+  
+  unless $options[:silent]
+    size = inventory.size
+    puts "info:"
+    puts "path: #{fs_tree.path}"
+    puts "size: #{get_size_string(size)} (#{size} Bytes)"
+    puts "files: #{fs_tree.file_list.length}"
+    puts "items: #{fs_tree.item_count}"
+  end
 
   # this is the default output
   unless ($options[:binary]||$options[:sql]||$options[:xml]||$options[:yaml]) && $options[:json].nil?
+    require 'json'
+    json_data = JSON.parse(inventory.to_json, :max_nesting => 100)
+    json_data = JSON.pretty_generate(json_data, :max_nesting => 100) 
     $options[:json_file] = "#{DEFAULT_NAME}.json" if $options[:json_file].nil?
     puts "writing JSON to #{$options[:json_file]}" unless $options[:silent]
     begin 
@@ -405,6 +418,7 @@ if __FILE__ == $0
   end
 
   if $options[:yaml]
+    require 'yaml'
     $options[:yaml_file] = "#{DEFAULT_NAME}.yaml" if $options[:yaml_file].nil?
     puts "writing YAML to #{$options[:yaml_file]}" unless $options[:silent]
     begin
@@ -417,10 +431,58 @@ if __FILE__ == $0
       file.close unless file.nil?
     end
   end
+  
+  if $options[:binary]
+    $options[:binary_file] = "#{DEFAULT_NAME}.bin" if $options[:binary_file].nil?
+    puts "writing binary dump to #{$options[:binary_file]}" unless $options[:silent]
+    begin
+      file = File.open($options[:binary_file], 'wb') 
+      file.write(Marshal.dump(inventory))
+    rescue
+      puts "error writing binary dump file"
+    ensure
+      file.close unless file.nil?
+    end
+  end
+  
+  if $options[:sql]
+    puts "SQL dump not yet implemented!"
+  end
 
-
-  puts "writing XML to inventory.xml" unless $options[:silent]
-  xml_file = File.open("inventory.xml", 'w')
-  xml_file.write(inventory.to_xml)
+  if $options[:xml]
+    require 'nokogiri'
+    $options[:xml_file] = "#{DEFAULT_NAME}.xml" if $options[:xml_file].nil?
+    puts "writing XML to #{$options[:xml_file]}" unless $options[:silent]
+    builder = Nokogiri::XML::Builder.new do |xml| 
+      xml.inventory{
+        #output the magic tab
+        inventory.magic_tab.descr_map.each{ |id, descr|
+          xml.magic_tab{
+            xml.id = id
+            xml.description = descr
+          } 
+        }
+        #ouput the mime tab
+        inventory.mime_tab.descr_map.each{ |id, descr|
+          xml.magic_tab{
+            xml.id = id
+            xml.description = descr
+          } 
+        }
+        #output the file structure
+        xml.file_structure{
+          filestruct_to_xml(xml, inventory.file_structure)
+        } 
+      }
+    end
+    begin
+      file = File.open($options[:xml_file], 'w') 
+      file.write(builder.to_xml)
+    rescue
+      puts "error writing XML file"
+    ensure
+      file.close unless file.nil?
+    end
+  end
 
 end
