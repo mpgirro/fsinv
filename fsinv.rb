@@ -36,7 +36,7 @@ def sanitize_string(string)
   return string
 end
 
-def get_size_string(bytes)
+def pretty_bytes_string(bytes)
   return "%.3f TB" % (bytes.to_f / BYTES_IN_TB) if bytes > BYTES_IN_TB
   return "%.3f GB" % (bytes.to_f / BYTES_IN_GB) if bytes > BYTES_IN_GB
   return "%.3f MB" % (bytes.to_f / BYTES_IN_MB) if bytes > BYTES_IN_MB
@@ -372,9 +372,8 @@ if __FILE__ == $0
       $options[:json_file] = json_file
     end
   
-    opts.on("-n", "--name INV_NAME", "Name of the inventory. This will change the name of the output files. Default is '#{DEFAULT_NAME}'") do |name|
-      $options[:name_flag] = true
-      $options[:inv_name] = name
+    opts.on("-n", "--name INV_NAME", "Name of the inventory. This will change the name of the output files. Default is '#{DEFAULT_NAME}'. Specific targets for file formats will overwrite this.") do |name|
+      $options[:name] = name
     end
   
     opts.on("-p", "--print FORMAT", [:json, :yaml, :xml], "Print a format to stdout (json|yaml|xml)") do |format|
@@ -437,7 +436,7 @@ if __FILE__ == $0
     size = inventory.size
     puts "info:"
     puts "path: #{fs_tree.path}"
-    puts "size: #{get_size_string(size)} (#{size} Bytes)"
+    puts "size: #{pretty_bytes_string(size)} (#{size} Bytes)"
     puts "files: #{fs_tree.file_list.length}"
     puts "items: #{fs_tree.item_count}"
   end
@@ -445,10 +444,16 @@ if __FILE__ == $0
   # this is the default output
   unless ($options[:binary]||$options[:sql]||$options[:xml]||$options[:yaml]) && $options[:json].nil?
     require 'json'
+    if $options[:json_file].nil?
+      if $options[:name].nil?
+        $options[:json_file] = "#{DEFAULT_NAME}.json"
+      else 
+        $options[:json_file] = "#{$options[:name]}.json"
+      end
+    end
+    puts "writing JSON to #{$options[:json_file]}" unless $options[:silent]
     json_data = JSON.parse(inventory.to_json, :max_nesting => 100)
     json_data = JSON.pretty_generate(json_data, :max_nesting => 100) 
-    $options[:json_file] = "#{DEFAULT_NAME}.json" if $options[:json_file].nil?
-    puts "writing JSON to #{$options[:json_file]}" unless $options[:silent]
     begin 
       file = File.open($options[:json_file], 'w') 
       file.write(json_data)
@@ -462,8 +467,14 @@ if __FILE__ == $0
   end
 
   if $options[:yaml]
-    require 'yaml'
-    $options[:yaml_file] = "#{DEFAULT_NAME}.yaml" if $options[:yaml_file].nil?
+    require 'yaml'  
+    if $options[:yaml_file].nil?
+      if $options[:name].nil?
+        $options[:yaml_file] = "#{DEFAULT_NAME}.yaml"
+      else 
+        $options[:yaml_file] = "#{$options[:name]}.yaml"
+      end
+    end
     puts "writing YAML to #{$options[:yaml_file]}" unless $options[:silent]
     begin
       yml_data = YAML::dump(inventory)
@@ -479,7 +490,13 @@ if __FILE__ == $0
   end
   
   if $options[:binary]
-    $options[:binary_file] = "#{DEFAULT_NAME}.bin" if $options[:binary_file].nil?
+    if $options[:binary_file].nil?
+      if $options[:name].nil?
+        $options[:binary_file] = "#{DEFAULT_NAME}.bin"
+      else 
+        $options[:binary_file] = "#{$options[:name]}.bin"
+      end
+    end
     puts "writing binary dump to #{$options[:binary_file]}" unless $options[:silent]
     begin
       file = File.open($options[:binary_file], 'wb') 
@@ -492,12 +509,27 @@ if __FILE__ == $0
   end
   
   if $options[:sql]
+    require 'sqlite3'
+    if $options[:sql_file].nil?
+      if $options[:name].nil?
+        $options[:sql_file] = "#{DEFAULT_NAME}.db"
+      else 
+        $options[:sql_file] = "#{$options[:name]}.db"
+      end
+    end
+    
     puts "SQL dump not yet implemented!"
   end
 
   if $options[:xml]
     require 'nokogiri'
-    $options[:xml_file] = "#{DEFAULT_NAME}.xml" if $options[:xml_file].nil?
+    if $options[:xml_file].nil?
+      if $options[:name].nil?
+        $options[:xml_file] = "#{DEFAULT_NAME}.xml"
+      else 
+        $options[:xml_file] = "#{$options[:name]}.xml"
+      end
+    end
     puts "writing XML to #{$options[:xml_file]}" unless $options[:silent]
     builder = Nokogiri::XML::Builder.new do |xml| 
       xml.inventory{
