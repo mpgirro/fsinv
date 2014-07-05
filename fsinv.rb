@@ -4,8 +4,13 @@
 # author: Maximilian Irro <max@disposia.org>, 2014
 
 require 'mime/types'
-require 'filemagic'
-require 'active_support/all' # to get to_xml()
+begin
+  require 'filemagic'
+rescue
+  puts "gem 'filemagic' required. Install using 'gem install ruby-filemagic'"
+  puts "If you have trouble on OSX you may ned to run 'brew install libmagic' before"
+  exit
+end
 require 'pathname'
 require 'optparse'
 
@@ -311,7 +316,7 @@ if __FILE__ == $0
     opts.separator ""
     opts.separator "Specific options:"
 
-    opts.on("-a", "--all", "Save in all formats to the default destinations. Equal to -bjqxy. Use -n to change the file names") do |all_flag|
+    opts.on("-a", "--all", "Save in all formats to the default destinations. Equal to -b -j -q -x -y. Use -n to change the file names") do |all_flag|
       $options[:binary]  = true
       $options[:json]    = true
       $options[:sql]     = true
@@ -410,6 +415,8 @@ if __FILE__ == $0
     begin 
       file = File.open($options[:json_file], 'w') 
       file.write(json_data)
+    rescue LoadError
+      puts "gem 'json' needed for XML creation. Install using 'gem install json'"
     rescue
       puts "error writing JSON file"
     ensure
@@ -425,6 +432,8 @@ if __FILE__ == $0
       yml_data = YAML::dump(inventory)
       file = File.open($options[:yaml_file], 'w') 
       file.write(yml_data)
+    rescue LoadError
+      puts "gem 'yaml' needed for XML creation. Install using 'gem install yaml'"
     rescue
       puts "error writing YAML file"
     ensure
@@ -478,6 +487,8 @@ if __FILE__ == $0
     begin
       file = File.open($options[:xml_file], 'w') 
       file.write(builder.to_xml)
+    rescue LoadError
+      puts "gem 'nokogiri' needed for XML creation. Install using 'gem install nokogiri'"
     rescue
       puts "error writing XML file"
     ensure
