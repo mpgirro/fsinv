@@ -358,11 +358,11 @@ end
 if __FILE__ == $0
 
   DEFAULT_NAME = "inventory"
-  USAGE_STR = "Usage: fsinv.rb basepath [$options]"
+  USAGE = "Usage: fsinv.rb basepath [options]"
 
   $options = {}
   OptionParser.new do |opts|
-    opts.banner = USAGE_STR
+    opts.banner = USAGE
     opts.separator ""
     opts.separator "Specific options:"
 
@@ -428,15 +428,16 @@ if __FILE__ == $0
 
   if ARGV[0].nil? 
     puts "No basepath provided"
-    puts USAGE_STR
+    puts USAGE
     exit
   elsif !File.directory?(ARGV[0])
     puts "Not a directory"
-    puts USAGE_STR
+    puts USAGE
     exit
   elsif ARGV.length > 1
     puts "Too many arguments"
-    puts USAGE_STR
+    p ARGV
+    puts USAGE
     exit 
   end
 
