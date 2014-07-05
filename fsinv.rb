@@ -110,7 +110,7 @@ end # LookupTable
 
 class FileDefinition
   
-  attr_accessor :bytes,:path,:mime_id,:magic_id
+  attr_accessor :path,:bytes,:ctime,:mtime,:mime_id,:magic_id
   
   def initialize(path, typecheck = true)
     @path = path
@@ -119,6 +119,18 @@ class FileDefinition
       @bytes = File.size(@path)
     rescue 
       puts "error: exception getting size for file #{path}" unless $options[:silent]
+    end
+    
+    begin 
+      @ctime = File.ctime(path)
+    rescue 
+      puts "error getting creation time for file #{path}" unless $options[:silent]
+    end
+    
+    begin 
+      @mtime = File.mtime(path)
+    rescue 
+      puts "error getting modification time for file #{path}" unless $options[:silent]
     end
     
     if typecheck
@@ -147,7 +159,7 @@ class FileDefinition
   
   def to_hash()
     p = sanitize_string(@path) rescue "path encoding broken" # there can be ArgumentError and UndefinedConversionError
-    return {"type" => "file","path" => p,"bytes" => bytes, "mime_id" => mime_id, "magic_id" => magic_id}
+    return {"type" => "file","path" => p,"bytes" => bytes, 'ctime' => ctime, 'mtime' => mtime, "mime_id" => mime_id, "magic_id" => magic_id}
   end
   
   def as_json(options = { })
@@ -159,29 +171,47 @@ class FileDefinition
   end
   
   def marshal_dump
-    return {"path" => path, "bytes" => bytes, "mime_id" => mime_id, "magic_id" => magic_id}
+    return {"path" => path, "bytes" => bytes, 'ctime' => ctime, 'mtime' => mtime, "mime_id" => mime_id, "magic_id" => magic_id}
   end
 
   def marshal_load(data)
     self.path = data['path']
     self.bytes = data['bytes']
-    self.file_list = data['mime_id']
-    self.file_count = data['magic_id']
+    self.ctime = data['ctime']
+    self.mtime = data['mtime']
+    self.mime_id = data['mime_id']
+    self.magic_id = data['magic_id']
   end
   
 end # FileDefinition
 
 class DirectoryDefinition
   
-  attr_accessor :path,:bytes,:file_list,:file_count,:item_count
+  attr_accessor :path,:bytes,:ctime,:mtime,:file_count,:item_count,:file_list
   
-  def initialize(path, size, file_list)
-    @path, @bytes, @file_list = path, size, file_list, @file_count = 0, @item_count = 1
+  def initialize(path)
+    @path = path
+    @bytes = 0
+    @file_list = []
+    @file_count = 0 
+    @item_count = 1
+    
+    begin 
+      @ctime = File.ctime(path)
+    rescue 
+      puts "error getting creation time for directory #{path}" unless $options[:silent]
+    end
+    
+    begin 
+      @mtime = File.mtime(path)
+    rescue 
+      puts "error getting modification time for directory #{path}" unless $options[:silent]
+    end
   end
   
   def as_json(options = { })
     p = sanitize_string(@path) rescue "path encoding broken" # there can be ArgumentError and UndefinedConversionError
-    return {"type" => "directory", "path" => p, "bytes" => bytes, "file_count" => file_count, "file_list" => file_list, "item_count" => item_count}
+    return {"type" => "directory", "path" => p, "bytes" => bytes, 'ctime' => ctime, 'mtime' => mtime, "file_count" => file_count, "item_count" => item_count, "file_list" => file_list}
   end
   
   def to_json(*a)
@@ -189,15 +219,17 @@ class DirectoryDefinition
   end
   
   def marshal_dump
-    return {'path' => path, 'bytes' => bytes, 'file_list' => file_list, 'file_count' => file_count, 'item_count' => item_count}
+    return {'path' => path, 'bytes' => bytes, 'ctime' => ctime, 'mtime' => mtime, 'file_count' => file_count, 'item_count' => item_count, 'file_list' => file_list}
   end
 
   def marshal_load(data)
     self.path = data['path']
     self.bytes = data['bytes']
-    self.file_list = data['file_list']
+    self.ctime = data['ctime']
+    self.mtime = data['mtime']
     self.file_count = data['file_count']
     self.item_count = data['item_count']
+    self.file_list = data['file_list']
   end
 end # DirectoryDefinition
 
@@ -213,9 +245,9 @@ def parse(folder_path, pseudofile = false)
     puts "processing #{folder_path}/*" unless pseudofile || $options[:silent]
   end
   
-  curr_dir = DirectoryDefinition.new(folder_path, 0, [])
+  curr_dir = DirectoryDefinition.new(folder_path)
   
-  begin
+  #begin
     Pathname.new(folder_path).children.each { |f| 
       file = f.to_s.encode("UTF-8")
       if $IGNORE_FILES.include?(File.basename(file))
@@ -226,15 +258,16 @@ def parse(folder_path, pseudofile = false)
         curr_dir.file_list << sub_folder unless pseudofile
         curr_dir.item_count += sub_folder.item_count unless pseudofile
       else
+        puts "processing #{file}" if $options[:verbose] && !pseudofile
         sub_file = FileDefinition.new(file, !pseudofile)
         curr_dir.bytes += sub_file.bytes
         curr_dir.file_list << sub_file unless pseudofile
         curr_dir.item_count += 1 unless pseudofile
       end
     }
-  rescue
-    puts "permission denied: #{curr_dir}" unless $options[:silent]
-  end
+ # rescue
+  #  puts "permission denied: #{curr_dir}" unless $options[:silent]
+    #end
 
   return curr_dir
 end # parse()
