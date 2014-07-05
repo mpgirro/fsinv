@@ -110,7 +110,7 @@ end # LookupTable
 
 class FileDefinition
   
-  attr_accessor :path,:bytes,:ctime,:mtime,:mime_id,:magic_id
+  attr_accessor :path,:bytes,:ctime,:mtime,:mime_id,:kind_id
   
   def initialize(path, typecheck = true)
     @path = path
@@ -145,21 +145,21 @@ class FileDefinition
     
       begin 
         description = sanitize_string($fmagic.file(@path))
-        $magic_tab.add(description) unless $magic_tab.contains?(description)
-        @magic_id = $magic_tab.getid(description)
+        $kind_tab.add(description) unless $kind_tab.contains?(description)
+        @kind_id = $kind_tab.getid(description)
       rescue
-        puts "error: file magic information unavailable" unless $options[:silent]
-        @magic_id = 0
+        puts "error: file kind information unavailable" unless $options[:silent]
+        @kind_id = 0
       end
     else
       @mime_id = 0
-      @magic_id = 0
+      @kind_id = 0
     end
   end
   
   def to_hash()
     p = sanitize_string(@path) rescue "path encoding broken" # there can be ArgumentError and UndefinedConversionError
-    return {"type" => "file","path" => p,"bytes" => bytes, 'ctime' => ctime, 'mtime' => mtime, "mime_id" => mime_id, "magic_id" => magic_id}
+    return {"type" => "file","path" => p,"bytes" => bytes, 'ctime' => ctime, 'mtime' => mtime, "mime_id" => mime_id, "kind_id" => kind_id}
   end
   
   def as_json(options = { })
@@ -171,7 +171,7 @@ class FileDefinition
   end
   
   def marshal_dump
-    return {"path" => path, "bytes" => bytes, 'ctime' => ctime, 'mtime' => mtime, "mime_id" => mime_id, "magic_id" => magic_id}
+    return {"path" => path, "bytes" => bytes, 'ctime' => ctime, 'mtime' => mtime, "mime_id" => mime_id, "kind_id" => kind_id}
   end
 
   def marshal_load(data)
@@ -180,7 +180,7 @@ class FileDefinition
     self.ctime = data['ctime']
     self.mtime = data['mtime']
     self.mime_id = data['mime_id']
-    self.magic_id = data['magic_id']
+    self.kind_id = data['kind_id']
   end
   
 end # FileDefinition
@@ -274,10 +274,10 @@ end # parse()
 
 class FsInventory
   
-  attr_accessor :magic_tab, :mime_tab, :file_structure
+  attr_accessor :kind_tab, :mime_tab, :file_structure
   
-  def initialize(magic_tab, mime_tab, file_structure)
-    @magic_tab = magic_tab
+  def initialize(kind_tab, mime_tab, file_structure)
+    @kind_tab = kind_tab
     @mime_tab  = mime_tab
     @file_structure = file_structure
   end
@@ -291,7 +291,7 @@ class FsInventory
   end
   
   def to_hash()
-    return {"magic_tab" => magic_tab, "mime_tab" => mime_tab, "file_structure" => file_structure}
+    return {"kind_tab" => kind_tab, "mime_tab" => mime_tab, "file_structure" => file_structure}
   end
   
   def as_json(options = { })
@@ -307,35 +307,52 @@ class FsInventory
   end
 
   def marshal_load(data)
-    self.magic_tab = data['magic_tab']
+    self.kind_tab = data['kind_tab']
     self.mime_tab = data['mime_tab']
     self.file_structure = data['file_structure']
   end
   
 end
 
-def filestruct_to_xml(xml, treenode)
-  case treenode
+def filestructure_to_xml(xml, defobj)
+  case defobj
   when DirectoryDefinition
     xml.directory{
-      xml.path(treenode.path)
-      xml.bytes(treenode.bytes)
-      xml.file_count(treenode.file_count)
-      xml.item_count(treenode.item_count)
+      xml.path(defobj.path)
+      xml.bytes(defobj.bytes)
+      xml.file_count(defobj.file_count)
+      xml.item_count(defobj.item_count)
       xml.file_list {
-        treenode.file_list.each do |fileitem|
-          filestruct_to_xml(xml, fileitem)
+        defobj.file_list.each do |child|
+          filestructure_to_xml(xml, child)
         end
       }
     }
   when FileDefinition
     xml.file{
-      xml.path(treenode.path)
-      xml.bytes(treenode.bytes)
-      xml.mime_id(treenode.mime_id)
-      xml.magic_id(treenode.magic_id)
+      xml.path(defobj.path)
+      xml.bytes(defobj.bytes)
+      xml.mime_id(defobj.mime_id)
+      xml.kind_id(defobj.kind_id)
     }
   end 
+end
+
+def filestructure_to_sqlite(db,defobj,parent_rowid)
+  case defobj
+  when DirectoryDefinition
+    db.execute("INSERT INTO directory(path, bytes, ctime, mtime, file_count, item_count, parent) 
+                VALUES ('#{defobj.path}', #{defobj.bytes}, '#{defobj.ctime}', '#{defobj.mtime}', 
+                #{defobj.file_count}, #{defobj.item_count},#{parent_rowid})")
+    rowid = db.execute("SELECT last_insert_rowid() AS rowid").first.first # return a 2-dim array   
+    defobj.file_list.each do |child|
+      filestructure_to_sqlite(db,child,rowid)
+    end
+  when FileDefinition
+    db.execute("INSERT INTO file(path, bytes, ctime, mtime, mime_id, kind_id, parent) 
+                VALUES ('#{defobj.path}',#{defobj.bytes}, '#{defobj.ctime}',
+                '#{defobj.mtime}',#{defobj.mime_id},#{defobj.kind_id},#{parent_rowid})")
+  end
 end
 
 if __FILE__ == $0
@@ -372,7 +389,8 @@ if __FILE__ == $0
       $options[:json_file] = json_file
     end
   
-    opts.on("-n", "--name INV_NAME", "Name of the inventory. This will change the name of the output files. Default is '#{DEFAULT_NAME}'. Specific targets for file formats will overwrite this.") do |name|
+    opts.on("-n", "--name INV_NAME", "Name of the inventory. This will change the name of the output files. 
+                                     Default is '#{DEFAULT_NAME}'. Specific targets for file formats will overwrite this.") do |name|
       $options[:name] = name
     end
   
@@ -425,12 +443,12 @@ if __FILE__ == $0
   main_path = ARGV[0]
 
   $fmagic = FileMagic.new 
-  $magic_tab = LookupTable.new # magic file descriptions
+  $kind_tab = LookupTable.new # magic file descriptions
   $mime_tab = LookupTable.new
 
   fs_tree = parse(main_path)
 
-  inventory = FsInventory.new($magic_tab, $mime_tab, fs_tree)
+  inventory = FsInventory.new($kind_tab, $mime_tab, fs_tree)
   
   unless $options[:silent]
     size = inventory.size
@@ -517,8 +535,31 @@ if __FILE__ == $0
         $options[:sql_file] = "#{$options[:name]}.db"
       end
     end
-    
-    puts "SQL dump not yet implemented!"
+
+    puts "writing SQL dump to #{$options[:sql_file]}" unless $options[:silent]
+    `rm #{$options[:sql_file]}`
+
+    begin
+        db = SQLite3::Database.new("#{$options[:sql_file]}")
+        db.execute "CREATE TABLE IF NOT EXISTS mime_tab(id INTEGER PRIMARY KEY, description TEXT)"
+        db.execute "CREATE TABLE IF NOT EXISTS kind_tab(id INTEGER PRIMARY KEY, description TEXT)"
+        db.execute "CREATE TABLE IF NOT EXISTS directory(id INTEGER PRIMARY KEY, path TEXT, 
+                    bytes INTEGER, ctime TEXT, mtime TEXT, file_count INTEGER, item_count INTEGER, 
+                    parent REFERENCES directory(rowid))" # rowid is an implicid column of sqlite
+        db.execute "CREATE TABLE IF NOT EXISTS file(id INTEGER PRIMARY KEY, path TEXT, 
+                    bytes INTEGER, ctime TEXT, mtime TEXT, mime_id REFERENCES mime_tab(id), 
+                    kind_id REFERENCES kind_tab(id), parent REFERENCES directory(rowid))" # rowid is an implicid column of sqlite
+                    
+        inventory.mime_tab.descr_map.each { |id, descr| db.execute("INSERT INTO mime_tab(id,description) VALUES (#{id},'#{descr}')") }
+        inventory.kind_tab.descr_map.each { |id, descr| db.execute("INSERT INTO kind_tab(id,description) VALUES (#{id},'#{descr}')") }
+        
+        filestructure_to_sqlite(db, inventory.file_structure, 1) # sqlite indizes start with 1
+        
+    rescue SQLite3::Exception => e 
+        puts e
+    ensure
+        db.close if db
+    end
   end
 
   if $options[:xml]
@@ -534,8 +575,8 @@ if __FILE__ == $0
     builder = Nokogiri::XML::Builder.new do |xml| 
       xml.inventory{
         #output the magic tab
-        xml.magic_tab{
-          inventory.magic_tab.descr_map.each{ |id, descr|
+        xml.kind_tab{
+          inventory.kind_tab.descr_map.each{ |id, descr|
             xml.item{
               xml.id(id)
               xml.description(descr)
@@ -543,7 +584,7 @@ if __FILE__ == $0
           } 
         }
         #ouput the mime tab
-        xml.magic_tab{
+        xml.kind_tab{
           inventory.mime_tab.descr_map.each{ |id, descr|
             xml.item{
               xml.id(id)
@@ -553,7 +594,7 @@ if __FILE__ == $0
         }
         #output the file structure
         xml.file_structure{
-          filestruct_to_xml(xml, inventory.file_structure)
+          filestructure_to_xml(xml, inventory.file_structure)
         } 
       }
     end
