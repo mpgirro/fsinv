@@ -373,8 +373,8 @@ if __FILE__ == $0
     end
   end.parse! # do the parsing. do it now!
 
-  p $options
-  p ARGV
+  #p $options
+  #p ARGV
 
   if ARGV[0].nil? 
     puts "No basepath provided"
@@ -384,6 +384,10 @@ if __FILE__ == $0
     puts "Not a directory"
     puts USAGE_STR
     exit
+  elsif ARGV.length > 1
+    puts "Too many arguments"
+    puts USAGE_STR
+    exit 
   end
 
   main_path = ARGV[0]
@@ -465,17 +469,21 @@ if __FILE__ == $0
     builder = Nokogiri::XML::Builder.new do |xml| 
       xml.inventory{
         #output the magic tab
-        inventory.magic_tab.descr_map.each{ |id, descr|
-          xml.magic_tab{
-            xml.id = id
-            xml.description = descr
+        xml.magic_tab{
+          inventory.magic_tab.descr_map.each{ |id, descr|
+            xml.item{
+              xml.id(id)
+              xml.description(descr)
+            }
           } 
         }
         #ouput the mime tab
-        inventory.mime_tab.descr_map.each{ |id, descr|
-          xml.magic_tab{
-            xml.id = id
-            xml.description = descr
+        xml.magic_tab{
+          inventory.mime_tab.descr_map.each{ |id, descr|
+            xml.item{
+              xml.id(id)
+              xml.description(descr)
+            }
           } 
         }
         #output the file structure
