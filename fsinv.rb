@@ -258,7 +258,7 @@ def parse(folder_path, pseudofile = false)
         curr_dir.file_list << sub_folder unless pseudofile
         curr_dir.item_count += sub_folder.item_count unless pseudofile
       else
-        puts "processing #{file}" if $options[:verbose] && !pseudofile
+        puts "processing #{file}" if $options[:verbose] && !pseudofile && $options[:silent].nil?
         sub_file = FileDefinition.new(file, !pseudofile)
         curr_dir.bytes += sub_file.bytes
         curr_dir.file_list << sub_file unless pseudofile
@@ -462,7 +462,6 @@ if __FILE__ == $0
 
   # this is the default output
   unless ($options[:binary]||$options[:sql]||$options[:xml]||$options[:yaml]) && $options[:json].nil?
-    require 'json'
     if $options[:json_file].nil?
       if $options[:name].nil?
         $options[:json_file] = "#{DEFAULT_NAME}.json"
@@ -474,10 +473,11 @@ if __FILE__ == $0
     json_data = JSON.parse(inventory.to_json, :max_nesting => 100)
     json_data = JSON.pretty_generate(json_data, :max_nesting => 100) 
     begin 
+      require 'json'
       file = File.open($options[:json_file], 'w') 
       file.write(json_data)
     rescue LoadError
-      puts "gem 'json' needed for XML creation. Install using 'gem install json'"
+      puts "gem 'json' needed for JSON creation. Install using 'gem install json'"
     rescue
       puts "error writing JSON file"
     ensure
@@ -486,7 +486,7 @@ if __FILE__ == $0
   end
 
   if $options[:yaml]
-    require 'yaml'  
+    
     if $options[:yaml_file].nil?
       if $options[:name].nil?
         $options[:yaml_file] = "#{DEFAULT_NAME}.yaml"
@@ -496,11 +496,12 @@ if __FILE__ == $0
     end
     puts "writing YAML to #{$options[:yaml_file]}" unless $options[:silent]
     begin
+      require 'yaml'  
       yml_data = YAML::dump(inventory)
       file = File.open($options[:yaml_file], 'w') 
       file.write(yml_data)
     rescue LoadError
-      puts "gem 'yaml' needed for XML creation. Install using 'gem install yaml'"
+      puts "gem 'yaml' needed for YAML creation. Install using 'gem install yaml'"
     rescue
       puts "error writing YAML file"
     ensure
@@ -528,7 +529,7 @@ if __FILE__ == $0
   end
   
   if $options[:sql]
-    require 'sqlite3'
+    
     if $options[:sql_file].nil?
       if $options[:name].nil?
         $options[:sql_file] = "#{DEFAULT_NAME}.db"
@@ -541,30 +542,33 @@ if __FILE__ == $0
     `rm #{$options[:sql_file]}`
 
     begin
-        db = SQLite3::Database.new("#{$options[:sql_file]}")
-        db.execute "CREATE TABLE IF NOT EXISTS mime_tab(id INTEGER PRIMARY KEY, description TEXT)"
-        db.execute "CREATE TABLE IF NOT EXISTS kind_tab(id INTEGER PRIMARY KEY, description TEXT)"
-        db.execute "CREATE TABLE IF NOT EXISTS directory(id INTEGER PRIMARY KEY, path TEXT, 
-                    bytes INTEGER, ctime TEXT, mtime TEXT, file_count INTEGER, item_count INTEGER, 
-                    parent REFERENCES directory(rowid))" # rowid is an implicid column of sqlite
-        db.execute "CREATE TABLE IF NOT EXISTS file(id INTEGER PRIMARY KEY, path TEXT, 
-                    bytes INTEGER, ctime TEXT, mtime TEXT, mime_id REFERENCES mime_tab(id), 
-                    kind_id REFERENCES kind_tab(id), parent REFERENCES directory(rowid))" # rowid is an implicid column of sqlite
-                    
-        inventory.mime_tab.descr_map.each { |id, descr| db.execute("INSERT INTO mime_tab(id,description) VALUES (#{id},'#{descr}')") }
-        inventory.kind_tab.descr_map.each { |id, descr| db.execute("INSERT INTO kind_tab(id,description) VALUES (#{id},'#{descr}')") }
-        
-        filestructure_to_sqlite(db, inventory.file_structure, 1) # sqlite indizes start with 1
-        
+      require 'sqlite3'
+      db = SQLite3::Database.new("#{$options[:sql_file]}")
+      db.execute "CREATE TABLE IF NOT EXISTS mime_tab(id INTEGER PRIMARY KEY, description TEXT)"
+      db.execute "CREATE TABLE IF NOT EXISTS kind_tab(id INTEGER PRIMARY KEY, description TEXT)"
+      db.execute "CREATE TABLE IF NOT EXISTS directory(id INTEGER PRIMARY KEY, path TEXT, 
+                  bytes INTEGER, ctime TEXT, mtime TEXT, file_count INTEGER, item_count INTEGER, 
+                  parent REFERENCES directory(rowid))" # rowid is an implicid column of sqlite
+      db.execute "CREATE TABLE IF NOT EXISTS file(id INTEGER PRIMARY KEY, path TEXT, 
+                  bytes INTEGER, ctime TEXT, mtime TEXT, mime_id REFERENCES mime_tab(id), 
+                  kind_id REFERENCES kind_tab(id), parent REFERENCES directory(rowid))" # rowid is an implicid column of sqlite
+                  
+      inventory.mime_tab.descr_map.each { |id, descr| db.execute("INSERT INTO mime_tab(id,description) VALUES (#{id},'#{descr}')") }
+      inventory.kind_tab.descr_map.each { |id, descr| db.execute("INSERT INTO kind_tab(id,description) VALUES (#{id},'#{descr}')") }
+      
+      filestructure_to_sqlite(db, inventory.file_structure, 1) # sqlite indizes start with 1
+      
     rescue SQLite3::Exception => e 
         puts e
+    rescue LoadError
+      puts "gem 'sqlite3' needed for SQLite DB creation. Install using 'gem install sqlite3'"
     ensure
         db.close if db
     end
   end
 
   if $options[:xml]
-    require 'nokogiri'
+    
     if $options[:xml_file].nil?
       if $options[:name].nil?
         $options[:xml_file] = "#{DEFAULT_NAME}.xml"
@@ -573,33 +577,35 @@ if __FILE__ == $0
       end
     end
     puts "writing XML to #{$options[:xml_file]}" unless $options[:silent]
-    builder = Nokogiri::XML::Builder.new do |xml| 
-      xml.inventory{
-        #output the magic tab
-        xml.kind_tab{
-          inventory.kind_tab.descr_map.each{ |id, descr|
-            xml.item{
-              xml.id(id)
-              xml.description(descr)
-            }
-          } 
-        }
-        #ouput the mime tab
-        xml.kind_tab{
-          inventory.mime_tab.descr_map.each{ |id, descr|
-            xml.item{
-              xml.id(id)
-              xml.description(descr)
-            }
-          } 
-        }
-        #output the file structure
-        xml.file_structure{
-          filestructure_to_xml(xml, inventory.file_structure)
-        } 
-      }
-    end
     begin
+      require 'nokogiri'
+      builder = Nokogiri::XML::Builder.new do |xml| 
+        xml.inventory{
+          #output the magic tab
+          xml.kind_tab{
+            inventory.kind_tab.descr_map.each{ |id, descr|
+              xml.item{
+                xml.id(id)
+                xml.description(descr)
+              }
+            } 
+          }
+          #ouput the mime tab
+          xml.kind_tab{
+            inventory.mime_tab.descr_map.each{ |id, descr|
+              xml.item{
+                xml.id(id)
+                xml.description(descr)
+              }
+            } 
+          }
+          #output the file structure
+          xml.file_structure{
+            filestructure_to_xml(xml, inventory.file_structure)
+          } 
+        }
+      end
+    
       file = File.open($options[:xml_file], 'w') 
       file.write(builder.to_xml)
     rescue LoadError
