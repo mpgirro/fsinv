@@ -247,7 +247,7 @@ def parse(folder_path, pseudofile = false)
   
   curr_dir = DirectoryDefinition.new(folder_path)
   
-  #begin
+  begin
     Pathname.new(folder_path).children.each { |f| 
       file = f.to_s.encode("UTF-8")
       if $IGNORE_FILES.include?(File.basename(file))
@@ -265,9 +265,9 @@ def parse(folder_path, pseudofile = false)
         curr_dir.item_count += 1 unless pseudofile
       end
     }
- # rescue
-  #  puts "permission denied: #{curr_dir}" unless $options[:silent]
-    #end
+  rescue
+    puts "permission denied: #{curr_dir}" unless $options[:silent]
+  end
 
   return curr_dir
 end # parse()
