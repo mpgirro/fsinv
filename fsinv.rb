@@ -347,20 +347,23 @@ def filestructure_to_xml(xml, defobj)
 end
 
 def filestructure_to_sqlite(db,defobj,parent_rowid)
+  rowcursor = parent_rowid
   case defobj
   when DirectoryDefinition
     db.execute("INSERT INTO directory(path, bytes, ctime, mtime, file_count, item_count, parent) 
                 VALUES ('#{defobj.path}', #{defobj.bytes}, '#{defobj.ctime}', '#{defobj.mtime}', 
                 #{defobj.file_count}, #{defobj.item_count},#{parent_rowid})")
-    rowid = db.execute("SELECT last_insert_rowid() AS rowid").first.first # return a 2-dim array   
+    new_parent_rowid = db.execute("SELECT last_insert_rowid() AS rowid").first.first # returns a 2-dim array   
     defobj.file_list.each do |child|
-      filestructure_to_sqlite(db,child,rowid)
+      rowid = filestructure_to_sqlite(db,child,new_parent_rowid)
+      rowcursor = rowid if rowid > rowcursor
     end
   when FileDefinition
-    db.execute("INSERT INTO file(path, bytes, ctime, mtime, mime_id, kind_id, parent) 
+    rowid = db.execute("INSERT INTO file(path, bytes, ctime, mtime, mime_id, kind_id, parent) 
                 VALUES ('#{defobj.path}',#{defobj.bytes}, '#{defobj.ctime}',
                 '#{defobj.mtime}',#{defobj.mime_id},#{defobj.kind_id},#{parent_rowid})")
   end
+  return rowcursor
 end
 
 if __FILE__ == $0
@@ -571,7 +574,11 @@ if __FILE__ == $0
       inventory.mime_tab.descr_map.each { |id, descr| db.execute("INSERT INTO mime_tab(id,description) VALUES (#{id},'#{descr}')") }
       inventory.kind_tab.descr_map.each { |id, descr| db.execute("INSERT INTO kind_tab(id,description) VALUES (#{id},'#{descr}')") }
       
-      filestructure_to_sqlite(db, inventory.file_structure, 1) # sqlite indizes start with 1
+      rowid = 1
+      inventory.file_structure.each do |fstruct|
+        rowid = filestructure_to_sqlite(db, fstruct, rowid) # sqlite indizes start with 1
+        rowid += 1 # start with a new root - make a rowid not used yet
+      end
       
     rescue SQLite3::Exception => e 
         puts e
