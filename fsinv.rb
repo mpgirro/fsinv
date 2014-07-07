@@ -616,7 +616,9 @@ if __FILE__ == $0
           }
           #output the file structure
           xml.file_structure{
-            filestructure_to_xml(xml, inventory.file_structure)
+            inventory.file_structure.each do |fstruct|
+              filestructure_to_xml(xml, fstruct)
+            end
           } 
         }
       end
