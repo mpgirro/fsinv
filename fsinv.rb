@@ -33,7 +33,7 @@ class LookupTable
   
   attr_accessor :descr_map, :idcursor
   
-  def initialize()
+  def initialize
     @descr_map = Hash.new
     @idcursor = 0
     self.add("unavailable")
@@ -375,7 +375,7 @@ def filestructure_to_sqlite(db,defobj,parent_rowid)
   return rowcursor
 end
 
-def infentory_to_json(inventory)
+def inventory_to_json(inventory)
   json_data = nil
   begin 
     require 'json'
@@ -387,7 +387,7 @@ def infentory_to_json(inventory)
   return json_data
 end
 
-def infentory_to_xml(inventory)
+def inventory_to_xml(inventory)
   xml_data = nil
   begin
     require 'nokogiri'
@@ -403,7 +403,7 @@ def infentory_to_xml(inventory)
           } 
         }
         #ouput the mime tab
-        xml.kind_tab{
+        xml.mime_tab{
           inventory.mime_tab.descr_map.each{ |id, descr|
             xml.item{
               xml.id(id)
@@ -426,7 +426,7 @@ def infentory_to_xml(inventory)
   return xml_data
 end
 
-def infentory_to_yaml(inventory)
+def inventory_to_yaml(inventory)
   yml_data = nil
   begin
     require 'yaml'  
@@ -561,7 +561,7 @@ if __FILE__ == $0
       end
     end
     puts "writing JSON to #{$options[:json_file]}" unless $options[:silent]
-    json_data = infentory_to_json(inventory)
+    json_data = inventory_to_json(inventory)
     unless json_data.nil?
       begin       
         file = File.open($options[:json_file], 'w') 
@@ -583,7 +583,7 @@ if __FILE__ == $0
       end
     end
     puts "writing YAML to #{$options[:yaml_file]}" unless $options[:silent]
-    yaml_data = infentory_to_yaml(inventory)
+    yaml_data = inventory_to_yaml(inventory)
     unless yaml_data.nil?
       begin
         file = File.open($options[:yaml_file], 'w') 
@@ -666,7 +666,7 @@ if __FILE__ == $0
       end
     end
     puts "writing XML to #{$options[:xml_file]}" unless $options[:silent]
-    xml_data = infentory_to_xml(inventory)
+    xml_data = inventory_to_xml(inventory)
     unless xml_data.nil?
       begin
         file = File.open($options[:xml_file], 'w') 
@@ -683,11 +683,11 @@ if __FILE__ == $0
     print_data = nil
     case $options[:print_format] 
     when :json
-      print_data = infentory_to_json(inventory)
+      print_data = inventory_to_json(inventory)
     when :xml
-      print_data = infentory_to_xml(inventory)
+      print_data = inventory_to_xml(inventory)
     when :yaml
-      print_data = infentory_to_yaml(inventory)
+      print_data = inventory_to_yaml(inventory)
     end
     puts print_data unless print_data.nil?
   end
