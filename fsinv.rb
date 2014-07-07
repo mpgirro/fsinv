@@ -29,21 +29,6 @@ BYTES_IN_TB = 10**12
 $IGNORE_FILES = ['.AppleDouble','.Parent','.DS_Store','Thumbs.db','__MACOSX']
 $PSEUDO_FILES = ['.app', '.bundle', '.mbox', '.plugin', '.sparsebundle'] # look like files on osx, are folders in truth
 
-def sanitize_string(string)
-  string = string.encode("UTF-16BE", :invalid=>:replace, :undef => :replace, :replace=>"?").encode("UTF-8")
-  pattern = /\"/
-  string = string.gsub(pattern, "\\\"") # escape double quotes in string
-  return string
-end
-
-def pretty_bytes_string(bytes)
-  return "%.3f TB" % (bytes.to_f / BYTES_IN_TB) if bytes > BYTES_IN_TB
-  return "%.3f GB" % (bytes.to_f / BYTES_IN_GB) if bytes > BYTES_IN_GB
-  return "%.3f MB" % (bytes.to_f / BYTES_IN_MB) if bytes > BYTES_IN_MB
-  return "%.3f KB" % (bytes.to_f / BYTES_IN_KB) if bytes > BYTES_IN_KB
-  return "#{bytes} B"
-end
-
 class LookupTable
   
   attr_accessor :descr_map, :idcursor
@@ -108,7 +93,6 @@ class LookupTable
     self.descr_map = data['descr_map']
     self.idcursor = data['idcursor']
   end
-  
 end # LookupTable
 
 class FileDefinition
@@ -117,25 +101,10 @@ class FileDefinition
   
   def initialize(path, typecheck = true)
     @path = path
-    @bytes = 0
-    begin
-      @bytes = File.size(@path)
-    rescue 
-      puts "error: exception getting size for file #{path}" unless $options[:silent]
-    end
-    
-    begin 
-      @ctime = File.ctime(path)
-    rescue 
-      puts "error getting creation time for file #{path}" unless $options[:silent]
-    end
-    
-    begin 
-      @mtime = File.mtime(path)
-    rescue 
-      puts "error getting modification time for file #{path}" unless $options[:silent]
-    end
-    
+    @bytes = File.size(@path) rescue (puts "error: exception getting size for file #{path}" unless $options[:silent]; 0)
+    @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" unless $options[:silent]; "unavailable" )
+    @mtime = File.mtime(path) rescue (puts "error getting modification time for directory #{path}" unless $options[:silent]; "unavailable" )
+
     if typecheck
       begin
         #@mime = `file -b --mime #{path}`
@@ -160,7 +129,7 @@ class FileDefinition
     end
   end
   
-  def to_hash()
+  def to_hash
     p = sanitize_string(@path) rescue "path encoding broken" # there can be ArgumentError and UndefinedConversionError
     return {
       "type" => "file",
@@ -200,7 +169,6 @@ class FileDefinition
     self.mime_id = data['mime_id']
     self.kind_id = data['kind_id']
   end
-  
 end # FileDefinition
 
 class DirectoryDefinition
@@ -213,7 +181,6 @@ class DirectoryDefinition
     @file_list = []
     @file_count = 0 
     @item_count = 1
-
     @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" unless $options[:silent]; "unavailable" )
     @mtime = File.mtime(path) rescue (puts "error getting modification time for directory #{path}" unless $options[:silent]; "unavailable" )
   end
@@ -259,7 +226,73 @@ class DirectoryDefinition
   end
 end # DirectoryDefinition
 
+class FsInventory
+  
+  attr_accessor :kind_tab, :mime_tab, :file_structure
+  
+  def initialize(kind_tab, mime_tab, file_structure)
+    @kind_tab = kind_tab
+    @mime_tab  = mime_tab
+    @file_structure = file_structure
+  end 
+  
+  def size
+    size = 0
+    file_structure.each do |fs|
+      size += fs.bytes
+    end
+    return size
+  end
+  
+  def item_count
+    count = 0
+    file_structure.each do |fs|
+      count += fs.item_count
+    end
+    return count
+  end
+  
+  def to_hash
+    return {
+      "kind_tab" => kind_tab, 
+      "mime_tab" => mime_tab, 
+      "file_structure" => file_structure
+    }
+  end
+  
+  def as_json(options = { })
+    return to_hash
+  end
+  
+  def to_json(*a)
+    as_json.to_json(*a)
+  end
+  
+  def marshal_dump
+    return to_hash
+  end
 
+  def marshal_load(data)
+    self.kind_tab = data['kind_tab']
+    self.mime_tab = data['mime_tab']
+    self.file_structure = data['file_structure']
+  end
+end
+
+def sanitize_string(string)
+  string = string.encode("UTF-16BE", :invalid=>:replace, :undef => :replace, :replace=>"?").encode("UTF-8")
+  pattern = /\"/
+  string = string.gsub(pattern, "\\\"") # escape double quotes in string
+  return string
+end
+
+def pretty_bytes_string(bytes)
+  return "%.3f TB" % (bytes.to_f / BYTES_IN_TB) if bytes > BYTES_IN_TB
+  return "%.3f GB" % (bytes.to_f / BYTES_IN_GB) if bytes > BYTES_IN_GB
+  return "%.3f MB" % (bytes.to_f / BYTES_IN_MB) if bytes > BYTES_IN_MB
+  return "%.3f KB" % (bytes.to_f / BYTES_IN_KB) if bytes > BYTES_IN_KB
+  return "#{bytes} B"
+end
 
 #returns DirectoryDefinition object
 def parse(folder_path, pseudofile = false)
@@ -298,60 +331,6 @@ def parse(folder_path, pseudofile = false)
   return curr_dir
 end # parse()
 
-class FsInventory
-  
-  attr_accessor :kind_tab, :mime_tab, :file_structure
-  
-  def initialize(kind_tab, mime_tab, file_structure)
-    @kind_tab = kind_tab
-    @mime_tab  = mime_tab
-    @file_structure = file_structure
-  end 
-  
-  def size()
-    size = 0
-    file_structure.each do |fs|
-      size += fs.bytes
-    end
-    return size
-  end
-  
-  def item_count()
-    count = 0
-    file_structure.each do |fs|
-      count += fs.item_count
-    end
-    return count
-  end
-  
-  def to_hash()
-    return {
-      "kind_tab" => kind_tab, 
-      "mime_tab" => mime_tab, 
-      "file_structure" => file_structure
-    }
-  end
-  
-  def as_json(options = { })
-    return to_hash
-  end
-  
-  def to_json(*a)
-    as_json.to_json(*a)
-  end
-  
-  def marshal_dump
-    return to_hash
-  end
-
-  def marshal_load(data)
-    self.kind_tab = data['kind_tab']
-    self.mime_tab = data['mime_tab']
-    self.file_structure = data['file_structure']
-  end
-  
-end
-
 def filestructure_to_xml(xml, defobj)
   case defobj
   when DirectoryDefinition
@@ -374,6 +353,26 @@ def filestructure_to_xml(xml, defobj)
       xml.kind_id(defobj.kind_id)
     }
   end 
+end
+
+def filestructure_to_sqlite(db,defobj,parent_rowid)
+  rowcursor = parent_rowid
+  case defobj
+  when DirectoryDefinition
+    db.execute("INSERT INTO directory(path, bytes, ctime, mtime, file_count, item_count, parent) 
+                VALUES ('#{defobj.path}', #{defobj.bytes}, '#{defobj.ctime}', '#{defobj.mtime}', 
+                #{defobj.file_count}, #{defobj.item_count},#{parent_rowid})")
+    new_parent_rowid = db.execute("SELECT last_insert_rowid() AS rowid").first.first # returns a 2-dim array   
+    defobj.file_list.each do |child|
+      rowid = filestructure_to_sqlite(db,child,new_parent_rowid)
+      rowcursor = rowid if rowid > rowcursor
+    end
+  when FileDefinition
+    db.execute("INSERT INTO file(path, bytes, ctime, mtime, mime_id, kind_id, parent) 
+                VALUES ('#{defobj.path}',#{defobj.bytes}, '#{defobj.ctime}',
+                '#{defobj.mtime}',#{defobj.mime_id},#{defobj.kind_id},#{parent_rowid})")
+  end
+  return rowcursor
 end
 
 def infentory_to_json(inventory)
@@ -438,25 +437,6 @@ def infentory_to_yaml(inventory)
   return yml_data
 end
 
-def filestructure_to_sqlite(db,defobj,parent_rowid)
-  rowcursor = parent_rowid
-  case defobj
-  when DirectoryDefinition
-    db.execute("INSERT INTO directory(path, bytes, ctime, mtime, file_count, item_count, parent) 
-                VALUES ('#{defobj.path}', #{defobj.bytes}, '#{defobj.ctime}', '#{defobj.mtime}', 
-                #{defobj.file_count}, #{defobj.item_count},#{parent_rowid})")
-    new_parent_rowid = db.execute("SELECT last_insert_rowid() AS rowid").first.first # returns a 2-dim array   
-    defobj.file_list.each do |child|
-      rowid = filestructure_to_sqlite(db,child,new_parent_rowid)
-      rowcursor = rowid if rowid > rowcursor
-    end
-  when FileDefinition
-    db.execute("INSERT INTO file(path, bytes, ctime, mtime, mime_id, kind_id, parent) 
-                VALUES ('#{defobj.path}',#{defobj.bytes}, '#{defobj.ctime}',
-                '#{defobj.mtime}',#{defobj.mime_id},#{defobj.kind_id},#{parent_rowid})")
-  end
-  return rowcursor
-end
 
 if __FILE__ == $0
 
@@ -556,7 +536,6 @@ if __FILE__ == $0
   inventory = FsInventory.new($kind_tab, $mime_tab, file_structure)
   
   unless $options[:silent]
-    puts "" # just to make it a bit pretty
     file_structure.each do |fs_tree|
       size = fs_tree.bytes
       puts "basepath: #{fs_tree.path}"
@@ -674,7 +653,7 @@ if __FILE__ == $0
     rescue LoadError
       puts "gem 'sqlite3' needed for SQLite DB creation. Install using 'gem install sqlite3'"
     ensure
-        db.close if db
+        db.close unless db.nil?
     end
   end
 
