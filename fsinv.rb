@@ -195,7 +195,7 @@ class DirectoryDefinition
     @file_list = []
     @file_count = 0 
     @item_count = 1
-    
+
     begin 
       @ctime = File.ctime(path)
     rescue 
@@ -280,14 +280,22 @@ class FsInventory
     @kind_tab = kind_tab
     @mime_tab  = mime_tab
     @file_structure = file_structure
-  end
-  
-  def root_path()
-    return @file_structure.path
-  end  
+  end 
   
   def size()
-    return file_structure.bytes
+    size = 0
+    file_structure.each do |fs|
+      size += fs.bytes
+    end
+    return size
+  end
+  
+  def item_count()
+    count = 0
+    file_structure.each do |fs|
+      count += fs.item_count
+    end
+    return count
   end
   
   def to_hash()
@@ -358,7 +366,7 @@ end
 if __FILE__ == $0
 
   DEFAULT_NAME = "inventory"
-  USAGE = "Usage: fsinv.rb basepath [options]"
+  USAGE = "Usage: fsinv.rb basepath1 [basepath2]* [options]"
 
   $options = {}
   OptionParser.new do |opts|
@@ -366,10 +374,11 @@ if __FILE__ == $0
     opts.separator ""
     opts.separator "Specific options:"
 
-    opts.on("-a", "--all", "Save in all formats to the default destinations. Equal to -b -j -q -x -y. Use -n to change the file names") do |all_flag|
+    opts.on("-a", "--all", "Save in all formats to the default destinations. 
+                                     Equal to -b -j -q -x -y. Use -n to change the file names") do |all_flag|
       $options[:binary]  = true
       $options[:json]    = true
-      $options[:sql]     = true
+      $options[:db]     = true
       $options[:xml]     = true
       $options[:yaml]    = true
     end
@@ -377,6 +386,11 @@ if __FILE__ == $0
     opts.on("-b", "--binary [FILE]", "Dump iventory data stuctures in binary format. Default destination is #{DEFAULT_NAME}.bin") do |binary_file|
       $options[:binary] = true
       $options[:binary_file] = binary_file
+    end
+    
+    opts.on("-d", "--db [FILE]", "Save inventory as SQLite database. Default destination is #{DEFAULT_NAME}.db") do |sql_file|
+      $options[:db] = true
+      $options[:db_file] = sql_file 
     end
   
     opts.on_tail("-h", "--help", "Show this message") do
@@ -397,11 +411,6 @@ if __FILE__ == $0
     opts.on("-p", "--print FORMAT", [:json, :yaml, :xml], "Print a format to stdout (json|yaml|xml)") do |format|
       $options[:print] = true
       $options[:print_format] = format
-    end
-  
-    opts.on("-q", "--sql [FILE]", "Save inventory as SQLite database. Default destination is #{DEFAULT_NAME}.db") do |sql_file|
-      $options[:sql] = true
-      $options[:sql_file] = sql_file 
     end
   
     opts.on("-s", "--silent", "Run in silent mode. No output or non-critical error messages will be printed") do |s|
@@ -425,43 +434,49 @@ if __FILE__ == $0
 
   #p $options
   #p ARGV
-
+  
   if ARGV[0].nil? 
-    puts "No basepath provided"
+    puts "No basepath provided. At least one needed"
     puts USAGE
     exit
-  elsif !File.directory?(ARGV[0])
-    puts "Not a directory"
-    puts USAGE
-    exit
-  elsif ARGV.length > 1
-    puts "Too many arguments"
-    p ARGV
-    puts USAGE
-    exit 
   end
 
-  main_path = ARGV[0]
+  ARGV.each do |arg|
+    if !File.directory?(arg)
+      puts "Not a directory: #{arg}"
+      puts USAGE
+      exit
+    end 
+  end
 
   $fmagic = FileMagic.new 
   $kind_tab = LookupTable.new # magic file descriptions
   $mime_tab = LookupTable.new
 
-  fs_tree = parse(main_path)
+  file_structure = []
+  ARGV.each do |basepath|
+      file_structure << parse(basepath)
+  end
 
-  inventory = FsInventory.new($kind_tab, $mime_tab, fs_tree)
+  inventory = FsInventory.new($kind_tab, $mime_tab, file_structure)
   
   unless $options[:silent]
+    puts "" # just to make it a bit pretty
+    file_structure.each do |fs_tree|
+      size = fs_tree.bytes
+      puts "basepath: #{fs_tree.path}"
+      puts "    size:  #{pretty_bytes_string(size)} (#{size} Bytes)"
+      puts "    files: #{fs_tree.file_list.length}"
+      puts "    items: #{fs_tree.item_count}"
+    end
     size = inventory.size
-    puts "info:"
-    puts "path: #{fs_tree.path}"
-    puts "size: #{pretty_bytes_string(size)} (#{size} Bytes)"
-    puts "files: #{fs_tree.file_list.length}"
-    puts "items: #{fs_tree.item_count}"
+    puts "total:"
+    puts "    size:  #{pretty_bytes_string(size)} (#{size} Bytes)"
+    puts "    items: #{inventory.item_count}"
   end
 
   # this is the default output
-  unless ($options[:binary]||$options[:sql]||$options[:xml]||$options[:yaml]) && $options[:json].nil?
+  unless ($options[:binary]||$options[:db]||$options[:xml]||$options[:yaml]) && $options[:json].nil?
     if $options[:json_file].nil?
       if $options[:name].nil?
         $options[:json_file] = "#{DEFAULT_NAME}.json"
@@ -528,22 +543,22 @@ if __FILE__ == $0
     end
   end
   
-  if $options[:sql]
+  if $options[:db]
     
-    if $options[:sql_file].nil?
+    if $options[:db_file].nil?
       if $options[:name].nil?
-        $options[:sql_file] = "#{DEFAULT_NAME}.db"
+        $options[:db_file] = "#{DEFAULT_NAME}.db"
       else 
-        $options[:sql_file] = "#{$options[:name]}.db"
+        $options[:db_file] = "#{$options[:name]}.db"
       end
     end
 
-    puts "writing SQL dump to #{$options[:sql_file]}" unless $options[:silent]
-    `rm #{$options[:sql_file]}`
+    puts "writing SQL dump to #{$options[:db_file]}" unless $options[:silent]
+    `rm #{$options[:db_file]}`
 
     begin
       require 'sqlite3'
-      db = SQLite3::Database.new("#{$options[:sql_file]}")
+      db = SQLite3::Database.new("#{$options[:db_file]}")
       db.execute "CREATE TABLE IF NOT EXISTS mime_tab(id INTEGER PRIMARY KEY, description TEXT)"
       db.execute "CREATE TABLE IF NOT EXISTS kind_tab(id INTEGER PRIMARY KEY, description TEXT)"
       db.execute "CREATE TABLE IF NOT EXISTS directory(id INTEGER PRIMARY KEY, path TEXT, 
