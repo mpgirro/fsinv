@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-# encoding: utf-8
+# -*- encoding : utf-8 -*-
 
 # author: Maximilian Irro <max@disposia.org>, 2014
 
@@ -98,7 +98,10 @@ class LookupTable
   end
   
   def marshal_dump
-    return {'descr_map' => descr_map, 'idcursor' => idcursor}
+    return {
+      'descr_map' => descr_map, 
+      'idcursor' => idcursor
+    }
   end
 
   def marshal_load(data)
@@ -159,7 +162,15 @@ class FileDefinition
   
   def to_hash()
     p = sanitize_string(@path) rescue "path encoding broken" # there can be ArgumentError and UndefinedConversionError
-    return {"type" => "file","path" => p,"bytes" => bytes, 'ctime' => ctime, 'mtime' => mtime, "mime_id" => mime_id, "kind_id" => kind_id}
+    return {
+      "type" => "file",
+      "path" => p,
+      "bytes" => bytes, 
+      'ctime' => ctime, 
+      'mtime' => mtime, 
+      "mime_id" => mime_id, 
+      "kind_id" => kind_id
+    }
   end
   
   def as_json(options = { })
@@ -171,7 +182,14 @@ class FileDefinition
   end
   
   def marshal_dump
-    return {"path" => path, "bytes" => bytes, 'ctime' => ctime, 'mtime' => mtime, "mime_id" => mime_id, "kind_id" => kind_id}
+    return {
+      "path" => path, 
+      "bytes" => bytes, 
+      'ctime' => ctime, 
+      'mtime' => mtime, 
+      "mime_id" => mime_id, 
+      "kind_id" => kind_id
+    }
   end
 
   def marshal_load(data)
@@ -196,22 +214,22 @@ class DirectoryDefinition
     @file_count = 0 
     @item_count = 1
 
-    begin 
-      @ctime = File.ctime(path)
-    rescue 
-      puts "error getting creation time for directory #{path}" unless $options[:silent]
-    end
-    
-    begin 
-      @mtime = File.mtime(path)
-    rescue 
-      puts "error getting modification time for directory #{path}" unless $options[:silent]
-    end
+    @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" unless $options[:silent]; "unavailable" )
+    @mtime = File.mtime(path) rescue (puts "error getting modification time for directory #{path}" unless $options[:silent]; "unavailable" )
   end
   
   def as_json(options = { })
     p = sanitize_string(@path) rescue "path encoding broken" # there can be ArgumentError and UndefinedConversionError
-    return {"type" => "directory", "path" => p, "bytes" => bytes, 'ctime' => ctime, 'mtime' => mtime, "file_count" => file_count, "item_count" => item_count, "file_list" => file_list}
+    return {
+      "type" => "directory", 
+      "path" => p, 
+      "bytes" => bytes, 
+      'ctime' => ctime, 
+      'mtime' => mtime, 
+      "file_count" => file_count, 
+      "item_count" => item_count, 
+      "file_list" => file_list
+    }
   end
   
   def to_json(*a)
@@ -219,7 +237,15 @@ class DirectoryDefinition
   end
   
   def marshal_dump
-    return {'path' => path, 'bytes' => bytes, 'ctime' => ctime, 'mtime' => mtime, 'file_count' => file_count, 'item_count' => item_count, 'file_list' => file_list}
+    return {
+      'path' => path, 
+      'bytes' => bytes, 
+      'ctime' => ctime, 
+      'mtime' => mtime, 
+      'file_count' => file_count, 
+      'item_count' => item_count, 
+      'file_list' => file_list
+    }
   end
 
   def marshal_load(data)
@@ -299,7 +325,11 @@ class FsInventory
   end
   
   def to_hash()
-    return {"kind_tab" => kind_tab, "mime_tab" => mime_tab, "file_structure" => file_structure}
+    return {
+      "kind_tab" => kind_tab, 
+      "mime_tab" => mime_tab, 
+      "file_structure" => file_structure
+    }
   end
   
   def as_json(options = { })
@@ -346,6 +376,68 @@ def filestructure_to_xml(xml, defobj)
   end 
 end
 
+def infentory_to_json(inventory)
+  json_data = nil
+  begin 
+    require 'json'
+    json_data = JSON.parse(inventory.to_json, :max_nesting => 100)
+    json_data = JSON.pretty_generate(json_data, :max_nesting => 100) 
+  rescue LoadError
+    puts "gem 'json' needed for JSON creation. Install using 'gem install json'"
+  end
+  return json_data
+end
+
+def infentory_to_xml(inventory)
+  xml_data = nil
+  begin
+    require 'nokogiri'
+    builder = Nokogiri::XML::Builder.new do |xml| 
+      xml.inventory{
+        #output the magic tab
+        xml.kind_tab{
+          inventory.kind_tab.descr_map.each{ |id, descr|
+            xml.item{
+              xml.id(id)
+              xml.description(descr)
+            }
+          } 
+        }
+        #ouput the mime tab
+        xml.kind_tab{
+          inventory.mime_tab.descr_map.each{ |id, descr|
+            xml.item{
+              xml.id(id)
+              xml.description(descr)
+            }
+          } 
+        }
+        #output the file structure
+        xml.file_structure{
+          inventory.file_structure.each do |fstruct|
+            filestructure_to_xml(xml, fstruct)
+          end
+        } 
+      }
+    end
+    xml_data = builder.to_xml
+  rescue LoadError
+    puts "gem 'nokogiri' needed for XML creation. Install using 'gem install nokogiri'"
+  end
+  return xml_data
+end
+
+def infentory_to_yaml(inventory)
+  yml_data = nil
+  begin
+    require 'yaml'  
+    yml_data = YAML::dump(inventory)
+  rescue LoadError
+    puts "gem 'yaml' needed for YAML creation. Install using 'gem install yaml'"
+  end
+  return yml_data
+end
+
 def filestructure_to_sqlite(db,defobj,parent_rowid)
   rowcursor = parent_rowid
   case defobj
@@ -359,7 +451,7 @@ def filestructure_to_sqlite(db,defobj,parent_rowid)
       rowcursor = rowid if rowid > rowcursor
     end
   when FileDefinition
-    rowid = db.execute("INSERT INTO file(path, bytes, ctime, mtime, mime_id, kind_id, parent) 
+    db.execute("INSERT INTO file(path, bytes, ctime, mtime, mime_id, kind_id, parent) 
                 VALUES ('#{defobj.path}',#{defobj.bytes}, '#{defobj.ctime}',
                 '#{defobj.mtime}',#{defobj.mime_id},#{defobj.kind_id},#{parent_rowid})")
   end
@@ -381,7 +473,7 @@ if __FILE__ == $0
                                      Equal to -b -j -q -x -y. Use -n to change the file names") do |all_flag|
       $options[:binary]  = true
       $options[:json]    = true
-      $options[:db]     = true
+      $options[:db]      = true
       $options[:xml]     = true
       $options[:yaml]    = true
     end
@@ -472,10 +564,12 @@ if __FILE__ == $0
       puts "    files: #{fs_tree.file_list.length}"
       puts "    items: #{fs_tree.item_count}"
     end
-    size = inventory.size
-    puts "total:"
-    puts "    size:  #{pretty_bytes_string(size)} (#{size} Bytes)"
-    puts "    items: #{inventory.item_count}"
+    if file_structure.length > 1
+      size = inventory.size
+      puts "total:"
+      puts "    size:  #{pretty_bytes_string(size)} (#{size} Bytes)"
+      puts "    items: #{inventory.item_count}"
+    end
   end
 
   # this is the default output
@@ -488,23 +582,20 @@ if __FILE__ == $0
       end
     end
     puts "writing JSON to #{$options[:json_file]}" unless $options[:silent]
-    json_data = JSON.parse(inventory.to_json, :max_nesting => 100)
-    json_data = JSON.pretty_generate(json_data, :max_nesting => 100) 
-    begin 
-      require 'json'
-      file = File.open($options[:json_file], 'w') 
-      file.write(json_data)
-    rescue LoadError
-      puts "gem 'json' needed for JSON creation. Install using 'gem install json'"
-    rescue
-      puts "error writing JSON file"
-    ensure
-      file.close unless file.nil?
+    json_data = infentory_to_json(inventory)
+    unless json_data.nil?
+      begin       
+        file = File.open($options[:json_file], 'w') 
+        file.write(json_data)
+      rescue
+        puts "error writing JSON file"
+      ensure
+        file.close unless file.nil?
+      end
     end
   end
 
   if $options[:yaml]
-    
     if $options[:yaml_file].nil?
       if $options[:name].nil?
         $options[:yaml_file] = "#{DEFAULT_NAME}.yaml"
@@ -513,17 +604,16 @@ if __FILE__ == $0
       end
     end
     puts "writing YAML to #{$options[:yaml_file]}" unless $options[:silent]
-    begin
-      require 'yaml'  
-      yml_data = YAML::dump(inventory)
-      file = File.open($options[:yaml_file], 'w') 
-      file.write(yml_data)
-    rescue LoadError
-      puts "gem 'yaml' needed for YAML creation. Install using 'gem install yaml'"
-    rescue
-      puts "error writing YAML file"
-    ensure
-      file.close unless file.nil?
+    yaml_data = infentory_to_yaml(inventory)
+    unless yaml_data.nil?
+      begin
+        file = File.open($options[:yaml_file], 'w') 
+        file.write(yaml_data)
+      rescue
+        puts "error writing YAML file"
+      ensure
+        file.close unless file.nil?
+      end
     end
   end
   
@@ -547,7 +637,6 @@ if __FILE__ == $0
   end
   
   if $options[:db]
-    
     if $options[:db_file].nil?
       if $options[:name].nil?
         $options[:db_file] = "#{DEFAULT_NAME}.db"
@@ -590,7 +679,6 @@ if __FILE__ == $0
   end
 
   if $options[:xml]
-    
     if $options[:xml_file].nil?
       if $options[:name].nil?
         $options[:xml_file] = "#{DEFAULT_NAME}.xml"
@@ -599,46 +687,30 @@ if __FILE__ == $0
       end
     end
     puts "writing XML to #{$options[:xml_file]}" unless $options[:silent]
-    begin
-      require 'nokogiri'
-      builder = Nokogiri::XML::Builder.new do |xml| 
-        xml.inventory{
-          #output the magic tab
-          xml.kind_tab{
-            inventory.kind_tab.descr_map.each{ |id, descr|
-              xml.item{
-                xml.id(id)
-                xml.description(descr)
-              }
-            } 
-          }
-          #ouput the mime tab
-          xml.kind_tab{
-            inventory.mime_tab.descr_map.each{ |id, descr|
-              xml.item{
-                xml.id(id)
-                xml.description(descr)
-              }
-            } 
-          }
-          #output the file structure
-          xml.file_structure{
-            inventory.file_structure.each do |fstruct|
-              filestructure_to_xml(xml, fstruct)
-            end
-          } 
-        }
+    xml_data = infentory_to_xml(inventory)
+    unless xml_data.nil?
+      begin
+        file = File.open($options[:xml_file], 'w') 
+        file.write(xml_data)
+      rescue
+        puts "error writing XML file"
+      ensure
+        file.close unless file.nil?
       end
-    
-      file = File.open($options[:xml_file], 'w') 
-      file.write(builder.to_xml)
-    rescue LoadError
-      puts "gem 'nokogiri' needed for XML creation. Install using 'gem install nokogiri'"
-    rescue
-      puts "error writing XML file"
-    ensure
-      file.close unless file.nil?
     end
+  end
+  
+  if $options[:print] 
+    print_data = nil
+    case $options[:print_format] 
+    when :json
+      print_data = infentory_to_json(inventory)
+    when :xml
+      print_data = infentory_to_xml(inventory)
+    when :yaml
+      print_data = infentory_to_yaml(inventory)
+    end
+    puts print_data unless print_data.nil?
   end
 
 end
