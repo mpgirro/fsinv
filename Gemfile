@@ -1,0 +1,8 @@
+source 'https://rubygems.org'
+ruby '1.9.3'
+gem 'nokogiri'
+gem 'sqlite3'
+gem 'pathname'
+gem 'ruby-filemagic'
+gem 'mime'
+gem 'json' 
