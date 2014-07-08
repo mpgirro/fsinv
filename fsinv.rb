@@ -14,11 +14,12 @@ end
 require 'pathname'
 require 'optparse'
 
+# Kibibyte, Mebibyte, Gibibyte, etc... 
 # use these if you find a KB to be 2^10 bits
-#BYTES_IN_KB = 2**10
-#BYTES_IN_MB = 2**20
-#BYTES_IN_GB = 2**30
-#BYTES_IN_TB = 2**40
+#BYTES_IN_KiB = 2**10
+#BYTES_IN_MiB = 2**20
+#BYTES_IN_GiB = 2**30
+#BYTES_IN_TiB = 2**40
 
 # these define a KB as 1000 bits
 BYTES_IN_KB = 10**3
