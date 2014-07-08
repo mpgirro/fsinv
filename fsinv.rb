@@ -441,7 +441,7 @@ end
 if __FILE__ == $0
 
   DEFAULT_NAME = "inventory"
-  USAGE = "Usage: fsinv.rb basepath1 [basepath2]* [options]"
+  USAGE = "Usage: fsinv.rb basepath1 [basepath2 [basepath3 [...]]] [options]"
 
   $options = {}
   OptionParser.new do |opts|
