@@ -282,6 +282,7 @@ end
 
 def sanitize_string(string)
   string = string.encode("UTF-16BE", :invalid=>:replace, :undef => :replace, :replace=>"?").encode("UTF-8")
+  string = string.gsub(/[\u0080-\u009F]/) {|x| x.getbyte(1).chr.force_encoding('windows-1252').encode('utf-8') }
   pattern = /\"/
   string = string.gsub(pattern, "\\\"") # escape double quotes in string
   return string
