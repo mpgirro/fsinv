@@ -67,7 +67,7 @@ class LookupTable
     return @descr_map[id]
   end
   
-  def to_a()
+  def to_a
     table_arr = []
     @descr_map.each do | id, descr | 
       table_arr << {"id" => id, "description" => descr}
@@ -288,10 +288,10 @@ def sanitize_string(string)
 end
 
 def pretty_bytes_string(bytes)
-  return "%.3f TB" % (bytes.to_f / BYTES_IN_TB) if bytes > BYTES_IN_TB
-  return "%.3f GB" % (bytes.to_f / BYTES_IN_GB) if bytes > BYTES_IN_GB
-  return "%.3f MB" % (bytes.to_f / BYTES_IN_MB) if bytes > BYTES_IN_MB
-  return "%.3f KB" % (bytes.to_f / BYTES_IN_KB) if bytes > BYTES_IN_KB
+  return "%.1f TB" % (bytes.to_f / BYTES_IN_TB) if bytes > BYTES_IN_TB
+  return "%.1f GB" % (bytes.to_f / BYTES_IN_GB) if bytes > BYTES_IN_GB
+  return "%.1f MB" % (bytes.to_f / BYTES_IN_MB) if bytes > BYTES_IN_MB
+  return "%.1f KB" % (bytes.to_f / BYTES_IN_KB) if bytes > BYTES_IN_KB
   return "#{bytes} B"
 end
 
