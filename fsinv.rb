@@ -13,6 +13,8 @@ rescue
 end
 require 'pathname'
 require 'optparse'
+#require 'digest'
+#require 'digest/crc32'
 
 # Kibibyte, Mebibyte, Gibibyte, etc... 
 # use these if you find a KB to be 2^10 bits
@@ -28,7 +30,10 @@ BYTES_IN_GB = 10**9
 BYTES_IN_TB = 10**12
 
 $IGNORE_FILES = ['.AppleDouble','.Parent','.DS_Store','Thumbs.db','__MACOSX']
-$PSEUDO_FILES = ['.app', '.bundle', '.mbox', '.plugin', '.sparsebundle'] # look like files on osx, are folders in truth
+
+# calculate the sizes of these folders, yet do not write their content into the
+# inventory index. these appear as files on osx (.app, .bundle)
+$PSEUDO_FILES = ['.app','.bundle','.mbox','.plugin','.sparsebundle']
 
 class LookupTable
   
@@ -124,6 +129,13 @@ class FileDefinition
         puts "error: file kind information unavailable" unless $options[:silent]
         @kind_id = 0
       end
+      
+      #crc32 = Digest::CRC32.file(@path).digest!.to_i.to_s(16)
+      #crc32 = Digest::CRC32.file(@path).hexdigest!
+      #puts "crc32: #{crc32}"
+      
+      #md5 = Digest::MD5.file(@path).hexdigest
+      #puts "md5: #{md5}"
     else
       @mime_id = 0
       @kind_id = 0
@@ -148,7 +160,7 @@ class FileDefinition
   end
     
   def to_json(*a)
-    return as_json.to_json(*a)
+    return as_json.to_json(*a )
   end
   
   def marshal_dump
@@ -302,6 +314,9 @@ def parse(folder_path, pseudofile = false)
   if $PSEUDO_FILES.include?(File.extname(folder_path)) # stuff like .app, .bundle, .mbox etc.
     puts "processing pseudofile #{folder_path}" unless pseudofile || $options[:silent]
     pseudofile = true
+  elsif File.basename(folder_path)[0] == "."
+    puts "processing dotfile #{folder_path}" unless pseudofile || $options[:silent]
+    pseudofile = true
   else
     puts "processing #{folder_path}/*" unless pseudofile || $options[:silent]
   end
@@ -380,8 +395,8 @@ end
 def inventory_to_json(inventory)
   json_data = nil
   begin 
-    require 'json'
-    json_data = JSON.parse(inventory.to_json, :max_nesting => 100)
+    #require 'json'
+    json_data = JSON.parse(inventory.to_json(max_nesting: 100))
     json_data = JSON.pretty_generate(json_data, :max_nesting => 100) 
   rescue LoadError
     puts "gem 'json' needed for JSON creation. Install using 'gem install json'"
@@ -401,18 +416,14 @@ def inventory_to_xml(inventory)
             xml.item{
               xml.id(id)
               xml.description(descr)
-            }
-          } 
-        }
+        } } }
         #ouput the mime tab
         xml.mime_tab{
           inventory.mime_tab.descr_map.each{ |id, descr|
             xml.item{
               xml.id(id)
               xml.description(descr)
-            }
-          } 
-        }
+        } } }
         #output the file structure
         xml.file_structure{
           inventory.file_structure.each do |fstruct|
@@ -563,16 +574,32 @@ if __FILE__ == $0
       end
     end
     puts "writing JSON to #{$options[:json_file]}" unless $options[:silent]
-    json_data = inventory_to_json(inventory)
-    unless json_data.nil?
-      begin       
-        file = File.open($options[:json_file], 'w') 
-        file.write(json_data)
-      rescue
-        puts "error writing JSON file"
-      ensure
-        file.close unless file.nil?
+    
+    begin
+      require 'json'
+      # monkey-patch for "JSON::NestingError: nesting is too deep"
+      module JSON
+        class << self
+          def parse(source, opts = {})
+            opts = ({:max_nesting => 100}).merge(opts)
+            Parser.new(source, opts).parse
+          end
+        end
       end
+      
+      json_data = inventory_to_json(inventory)
+      unless json_data.nil?
+        begin       
+          file = File.open($options[:json_file], 'w') 
+          file.write(json_data)
+        rescue
+          puts "error writing JSON file"
+        ensure
+          file.close unless file.nil?
+        end
+      end
+    rescue LoadError
+      puts "gem 'json' needed for JSON creation. Install using 'gem install json'"
     end
   end
 
