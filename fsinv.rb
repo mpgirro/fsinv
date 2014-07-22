@@ -13,7 +13,8 @@ rescue
 end
 require 'pathname'
 require 'optparse'
-#require 'digest'
+require 'ffi-xattr'
+require 'digest/md5'
 #require 'digest/crc32'
 
 # Kibibyte, Mebibyte, Gibibyte, etc... 
@@ -29,7 +30,7 @@ BYTES_IN_MB = 10**6
 BYTES_IN_GB = 10**9
 BYTES_IN_TB = 10**12
 
-$IGNORE_FILES = ['.AppleDouble','.Parent','.DS_Store','Thumbs.db','__MACOSX']
+$IGNORE_FILES = ['.AppleDouble','.Parent','.DS_Store','Thumbs.db','__MACOSX','.wine']
 
 # calculate the sizes of these folders, yet do not write their content into the
 # inventory index. these appear as files on osx (.app, .bundle)
@@ -60,7 +61,7 @@ class LookupTable
     end
   end
   
-  def getid(descr)
+  def get_id(descr)
     if descr == ""
       return 0
     else
@@ -68,7 +69,7 @@ class LookupTable
     end
   end
   
-  def getdescr(id)
+  def get_descr(id)
     return @descr_map[id]
   end
   
@@ -103,20 +104,21 @@ end # LookupTable
 
 class FileDefinition
   
-  attr_accessor :path,:bytes,:ctime,:mtime,:mime_id,:kind_id
+  attr_accessor :path,:bytes,:ctime,:mtime,:mime_id,:kind_id,:md5
   
   def initialize(path, typecheck = true)
     @path = path
     @bytes = File.size(@path) rescue (puts "error: exception getting size for file #{path}" unless $options[:silent]; 0)
-    @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" unless $options[:silent]; "unavailable" )
-    @mtime = File.mtime(path) rescue (puts "error getting modification time for directory #{path}" unless $options[:silent]; "unavailable" )
-
+    
     if typecheck
+      @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" unless $options[:silent]; "unavailable" )
+      @mtime = File.mtime(path) rescue (puts "error getting modification time for directory #{path}" unless $options[:silent]; "unavailable" )
+    
       begin
         #@mime = `file -b --mime #{path}`
         description = MIME::Types.type_for(@path).join(', ')
         $mime_tab.add(description) unless $mime_tab.contains?(description)
-        @mime_id = $mime_tab.getid(description)
+        @mime_id = $mime_tab.get_id(description)
       rescue ArgumentError # if this happens you should definitly repair some file names
         @mime_id = 0
       end
@@ -124,7 +126,7 @@ class FileDefinition
       begin 
         description = sanitize_string($fmagic.file(@path))
         $kind_tab.add(description) unless $kind_tab.contains?(description)
-        @kind_id = $kind_tab.getid(description)
+        @kind_id = $kind_tab.get_id(description)
       rescue
         puts "error: file kind information unavailable" unless $options[:silent]
         @kind_id = 0
@@ -134,8 +136,7 @@ class FileDefinition
       #crc32 = Digest::CRC32.file(@path).hexdigest!
       #puts "crc32: #{crc32}"
       
-      #md5 = Digest::MD5.file(@path).hexdigest
-      #puts "md5: #{md5}"
+      @md5 = Digest::MD5.file(@path).hexdigest if $options[:md5]
     else
       @mime_id = 0
       @kind_id = 0
@@ -144,7 +145,7 @@ class FileDefinition
   
   def to_hash
     p = sanitize_string(@path) rescue "path encoding broken" # there can be ArgumentError and UndefinedConversionError
-    return {
+    h = {
       "type" => "file",
       "path" => p,
       "bytes" => bytes, 
@@ -153,6 +154,8 @@ class FileDefinition
       "mime_id" => mime_id, 
       "kind_id" => kind_id
     }
+    h["md5"] = @md5 unless md5.nil?
+    return h
   end
   
   def as_json(options = { })
@@ -164,7 +167,7 @@ class FileDefinition
   end
   
   def marshal_dump
-    return {
+    h = {
       "path" => path, 
       "bytes" => bytes, 
       'ctime' => ctime, 
@@ -188,14 +191,16 @@ class DirectoryDefinition
   
   attr_accessor :path,:bytes,:ctime,:mtime,:file_count,:item_count,:file_list
   
-  def initialize(path)
+  def initialize(path, pseudofile)
     @path = path
     @bytes = 0
     @file_list = []
     @file_count = 0 
     @item_count = 1
-    @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" unless $options[:silent]; "unavailable" )
-    @mtime = File.mtime(path) rescue (puts "error getting modification time for directory #{path}" unless $options[:silent]; "unavailable" )
+    unless pseudofile
+      @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" unless $options[:silent]; "unavailable" )
+      @mtime = File.mtime(path) rescue (puts "error getting modification time for directory #{path}" unless $options[:silent]; "unavailable" )
+    end
   end
   
   def as_json(options = { })
@@ -241,12 +246,13 @@ end # DirectoryDefinition
 
 class FsInventory
   
-  attr_accessor :kind_tab, :mime_tab, :file_structure
+  attr_accessor :kind_tab, :mime_tab, :file_structure, :timestamp
   
   def initialize(kind_tab, mime_tab, file_structure)
     @kind_tab = kind_tab
     @mime_tab  = mime_tab
     @file_structure = file_structure
+    @timestamp = Time.now
   end 
   
   def size
@@ -267,9 +273,10 @@ class FsInventory
   
   def to_hash
     return {
+      "timestamp" => timestamp,
+      "file_structure" => file_structure,
       "kind_tab" => kind_tab, 
-      "mime_tab" => mime_tab, 
-      "file_structure" => file_structure
+      "mime_tab" => mime_tab
     }
   end
   
@@ -289,6 +296,7 @@ class FsInventory
     self.kind_tab = data['kind_tab']
     self.mime_tab = data['mime_tab']
     self.file_structure = data['file_structure']
+    self.timestamp = data['timestamp']
   end
 end
 
@@ -311,7 +319,11 @@ end
 #returns DirectoryDefinition object
 def parse(folder_path, pseudofile = false)
   
-  if $PSEUDO_FILES.include?(File.extname(folder_path)) # stuff like .app, .bundle, .mbox etc.
+  if $IGNORE_FILES.include?(File.basename(folder_path))
+    # do nothing
+  elsif File.basename(folder_path)[0..1] == "._"
+    # these are some osx files no one cares about -> ignore
+  elsif $PSEUDO_FILES.include?(File.extname(folder_path)) # stuff like .app, .bundle, .mbox etc.
     puts "processing pseudofile #{folder_path}" unless pseudofile || $options[:silent]
     pseudofile = true
   elsif File.basename(folder_path)[0] == "."
@@ -321,7 +333,7 @@ def parse(folder_path, pseudofile = false)
     puts "processing #{folder_path}/*" unless pseudofile || $options[:silent]
   end
   
-  curr_dir = DirectoryDefinition.new(folder_path)
+  curr_dir = DirectoryDefinition.new(folder_path, pseudofile)
   
   begin
     Pathname.new(folder_path).children.each { |f| 
@@ -489,6 +501,10 @@ if __FILE__ == $0
     opts.on("-j", "--json [FILE]", "Save inventory in JSON file format. Default destination is #{DEFAULT_NAME}.json") do |json_file|
       $options[:json] = true
       $options[:json_file] = json_file
+    end
+    
+    opts.on("-m", "--md5", "Calculate MD5 hashes for each file") do |md5|
+      $options[:md5] = true
     end
   
     opts.on("-n", "--name INV_NAME", "Name of the inventory. This will change the name of the output files. 
