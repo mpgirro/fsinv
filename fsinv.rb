@@ -13,9 +13,9 @@ rescue
 end
 require 'pathname'
 require 'optparse'
-require 'ffi-xattr'
 require 'digest/md5'
 #require 'digest/crc32'
+#require 'ffi-xattr'
 
 # Kibibyte, Mebibyte, Gibibyte, etc... 
 # use these if you find a KB to be 2^10 bits
@@ -104,11 +104,12 @@ end # LookupTable
 
 class FileDefinition
   
-  attr_accessor :path,:bytes,:ctime,:mtime,:mime_id,:kind_id,:md5
+  attr_accessor :path,:bytes,:ctime,:mtime,:xattr,:mime_id,:kind_id,:md5
   
   def initialize(path, typecheck = true)
     @path = path
     @bytes = File.size(@path) rescue (puts "error: exception getting size for file #{path}" unless $options[:silent]; 0)
+    @xattr = get_xattr(path)
     
     if typecheck
       @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" unless $options[:silent]; "unavailable" )
@@ -151,6 +152,7 @@ class FileDefinition
       "bytes" => bytes, 
       'ctime' => ctime, 
       'mtime' => mtime, 
+      'xattr' => xattr,
       "mime_id" => mime_id, 
       "kind_id" => kind_id
     }
@@ -172,6 +174,7 @@ class FileDefinition
       "bytes" => bytes, 
       'ctime' => ctime, 
       'mtime' => mtime, 
+      'xattr' => xattr,
       "mime_id" => mime_id, 
       "kind_id" => kind_id
     }
@@ -182,6 +185,7 @@ class FileDefinition
     self.bytes = data['bytes']
     self.ctime = data['ctime']
     self.mtime = data['mtime']
+    self.xattr = data['xattr']
     self.mime_id = data['mime_id']
     self.kind_id = data['kind_id']
   end
@@ -189,7 +193,7 @@ end # FileDefinition
 
 class DirectoryDefinition
   
-  attr_accessor :path,:bytes,:ctime,:mtime,:file_count,:item_count,:file_list
+  attr_accessor :path,:bytes,:ctime,:mtime,:xattr,:file_count,:item_count,:file_list
   
   def initialize(path, pseudofile)
     @path = path
@@ -197,6 +201,7 @@ class DirectoryDefinition
     @file_list = []
     @file_count = 0 
     @item_count = 1
+    @xattr = get_xattr(path)
     unless pseudofile
       @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" unless $options[:silent]; "unavailable" )
       @mtime = File.mtime(path) rescue (puts "error getting modification time for directory #{path}" unless $options[:silent]; "unavailable" )
@@ -213,6 +218,7 @@ class DirectoryDefinition
       'mtime' => mtime, 
       "file_count" => file_count, 
       "item_count" => item_count, 
+      'xattr' => xattr,
       "file_list" => file_list
     }
   end
@@ -229,6 +235,7 @@ class DirectoryDefinition
       'mtime' => mtime, 
       'file_count' => file_count, 
       'item_count' => item_count, 
+      'xattr' => xattr,
       'file_list' => file_list
     }
   end
@@ -240,6 +247,7 @@ class DirectoryDefinition
     self.mtime = data['mtime']
     self.file_count = data['file_count']
     self.item_count = data['item_count']
+    self.xattr = data['xattr']
     self.file_list = data['file_list']
   end
 end # DirectoryDefinition
@@ -314,6 +322,25 @@ def pretty_bytes_string(bytes)
   return "%.1f MB" % (bytes.to_f / BYTES_IN_MB) if bytes > BYTES_IN_MB
   return "%.1f KB" % (bytes.to_f / BYTES_IN_KB) if bytes > BYTES_IN_KB
   return "#{bytes} B"
+end
+
+def get_xattr(file_path)
+  case RUBY_PLATFORM
+  when /darwin/ # = osx
+    # array with the kMDItemUserTags strings 
+    # of the extended file attributes of 'path'
+    tags = %x{mdls -name 'kMDItemUserTags' -raw "#{file_path}"|tr -d "()\n"}.split(',').map { |tag| 
+      tag.strip.gsub(/"(.*?)"/,"\\1")
+    }
+    # if there are now tags, mdls returns "null" -> we don't want this
+    tags = [] if tags.length == 1 && tags[0]
+    return tags
+  #when /linux/
+  #when /bsd/
+  else
+    return []
+  end
+  
 end
 
 #returns DirectoryDefinition object
