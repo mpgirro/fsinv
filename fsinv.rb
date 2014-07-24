@@ -156,7 +156,7 @@ class FileDefinition
       "kind_id" => kind_id
     }
     h["md5"] = @md5 unless md5.nil?
-    h["osx_tags"] = @osx_tags unless osx_tags.nil?
+    h["osx_tags"] = @osx_tags unless osx_tags.empty?
     return h
   end
   
@@ -194,7 +194,7 @@ class DirectoryDefinition
     @bytes = 0
     @file_list = []
     @file_count = 0 
-    @item_count = 1
+    @item_count = 0
     @osx_tags = get_osx_tags(path) if /darwin/.match(RUBY_PLATFORM) # == osx
     unless pseudofile
       @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" unless $options[:silent]; "unavailable" )
@@ -214,7 +214,7 @@ class DirectoryDefinition
       "item_count" => item_count, 
       "file_list" => file_list
     }
-    h["osx_tags"] = @osx_tags unless osx_tags.nil?
+    h["osx_tags"] = @osx_tags unless osx_tags.empty?
     return h
   end
   
@@ -354,6 +354,7 @@ def parse(folder_path, pseudofile = false)
         sub_folder = parse(file, pseudofile)
         curr_dir.bytes += sub_folder.bytes
         curr_dir.file_list << sub_folder unless pseudofile
+        curr_dir.item_count += 1 # count this directory as an item
         curr_dir.item_count += sub_folder.item_count unless pseudofile
       else
         puts "processing #{file}" if $options[:verbose] && !pseudofile && $options[:silent].nil?
