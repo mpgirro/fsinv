@@ -15,7 +15,7 @@ require 'pathname'
 require 'optparse'
 require 'digest/md5'
 #require 'digest/crc32'
-#require 'ffi-xattr'
+require 'ffi-xattr'
 
 # Kibibyte, Mebibyte, Gibibyte, etc... 
 # use these if you find a KB to be 2^10 bits
@@ -104,7 +104,7 @@ end # LookupTable
 
 class FileDefinition
   
-  attr_accessor :path,:bytes,:ctime,:mtime,:mime_id,:kind_id,:md5,:osx_tags
+  attr_accessor :path,:bytes,:ctime,:mtime,:mime_id,:kind_id,:md5,:osx_tags,:fshugo_tags
   
   def initialize(path, typecheck = true)
     @path = path
@@ -138,6 +138,7 @@ class FileDefinition
       
       @md5 = Digest::MD5.file(@path).hexdigest if $options[:md5]
       @osx_tags = get_osx_tags(path) if /darwin/.match(RUBY_PLATFORM) # == osx
+      @fshugo_tags = get_fshugo_tags(path)
     else
       @mime_id = 0
       @kind_id = 0
@@ -157,6 +158,7 @@ class FileDefinition
     }
     h["md5"] = @md5 unless md5.nil?
     h["osx_tags"] = @osx_tags unless osx_tags.empty?
+    h["fshugo_tags"] = @fshugo_tags unless @fshugo_tags.empty?
     return h
   end
   
@@ -180,6 +182,7 @@ class FileDefinition
     self.ctime = data['ctime']
     self.mtime = data['mtime']
     self.osx_tags = data['osx_tags'] if data['osx_tags'].exists?
+    self.fshugo_tags = data['fshugo_tags'] if data['fshugo_tags'].exists?
     self.mime_id = data['mime_id']
     self.kind_id = data['kind_id']
   end
@@ -187,7 +190,7 @@ end # FileDefinition
 
 class DirectoryDefinition
   
-  attr_accessor :path,:bytes,:ctime,:mtime,:file_count,:item_count,:osx_tags,:file_list
+  attr_accessor :path,:bytes,:ctime,:mtime,:file_count,:item_count,:osx_tags,:fshugo_tags,:file_list
   
   def initialize(path, pseudofile)
     @path = path
@@ -196,6 +199,7 @@ class DirectoryDefinition
     @file_count = 0 
     @item_count = 0
     @osx_tags = get_osx_tags(path) if /darwin/.match(RUBY_PLATFORM) # == osx
+    @fshugo_tags = get_fshugo_tags(path)
     unless pseudofile
       @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" unless $options[:silent]; "unavailable" )
       @mtime = File.mtime(path) rescue (puts "error getting modification time for directory #{path}" unless $options[:silent]; "unavailable" )
@@ -211,10 +215,11 @@ class DirectoryDefinition
       'ctime' => ctime, 
       'mtime' => mtime, 
       "file_count" => file_count, 
-      "item_count" => item_count, 
-      "file_list" => file_list
+      "item_count" => item_count
     }
-    h["osx_tags"] = @osx_tags unless osx_tags.empty?
+    h["osx_tags"] = @osx_tags unless @osx_tags.empty?
+    h["fshugo_tags"] = @fshugo_tags unless @fshugo_tags.empty?
+    h["file_list"] = file_list
     return h
   end
   
@@ -236,6 +241,7 @@ class DirectoryDefinition
     self.file_count = data['file_count']
     self.item_count = data['item_count']
     self.osx_tags = data['osx_tags'] if data['osx_tags'].exists?
+    self.fshugo_tags = data['fshugo_tags'] if data['fshugo_tags'].exists?
     self.file_list = data['file_list']
   end
 end # DirectoryDefinition
@@ -324,6 +330,15 @@ def get_osx_tags(file_path)
   else
     return tags
   end
+end
+
+def get_fshugo_tags(file_path)
+  xattr = Xattr.new(file_path)
+  unless xattr["fshugo"].nil?
+    return xattr["fshugo"].split(";") 
+  else
+    return []
+  end 
 end
 
 #returns DirectoryDefinition object
@@ -594,11 +609,12 @@ if __FILE__ == $0
   # this is the default output
   unless ($options[:binary]||$options[:db]||$options[:xml]||$options[:yaml]) && $options[:json].nil?
     if $options[:json_file].nil?
-      if $options[:name].nil?
-        $options[:json_file] = "#{DEFAULT_NAME}.json"
-      else 
-        $options[:json_file] = "#{$options[:name]}.json"
-      end
+      $options[:json_file] = 
+        if $options[:name].nil?
+          "#{DEFAULT_NAME}.json"
+        else 
+          "#{$options[:name]}.json"
+        end
     end
     puts "writing JSON to #{$options[:json_file]}" unless $options[:silent]
     
