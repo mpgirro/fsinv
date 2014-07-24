@@ -104,12 +104,11 @@ end # LookupTable
 
 class FileDefinition
   
-  attr_accessor :path,:bytes,:ctime,:mtime,:xattr,:mime_id,:kind_id,:md5
+  attr_accessor :path,:bytes,:ctime,:mtime,:mime_id,:kind_id,:md5,:osx_tags
   
   def initialize(path, typecheck = true)
     @path = path
     @bytes = File.size(@path) rescue (puts "error: exception getting size for file #{path}" unless $options[:silent]; 0)
-    @xattr = get_xattr(path)
     
     if typecheck
       @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" unless $options[:silent]; "unavailable" )
@@ -138,6 +137,7 @@ class FileDefinition
       #puts "crc32: #{crc32}"
       
       @md5 = Digest::MD5.file(@path).hexdigest if $options[:md5]
+      @osx_tags = get_osx_tags(path) if /darwin/.match(RUBY_PLATFORM) # == osx
     else
       @mime_id = 0
       @kind_id = 0
@@ -152,11 +152,11 @@ class FileDefinition
       "bytes" => bytes, 
       'ctime' => ctime, 
       'mtime' => mtime, 
-      'xattr' => xattr,
       "mime_id" => mime_id, 
       "kind_id" => kind_id
     }
     h["md5"] = @md5 unless md5.nil?
+    h["osx_tags"] = @osx_tags unless osx_tags.nil?
     return h
   end
   
@@ -169,15 +169,9 @@ class FileDefinition
   end
   
   def marshal_dump
-    h = {
-      "path" => path, 
-      "bytes" => bytes, 
-      'ctime' => ctime, 
-      'mtime' => mtime, 
-      'xattr' => xattr,
-      "mime_id" => mime_id, 
-      "kind_id" => kind_id
-    }
+    h = self.to_json
+    h.delete("type")
+    return h
   end
 
   def marshal_load(data)
@@ -185,7 +179,7 @@ class FileDefinition
     self.bytes = data['bytes']
     self.ctime = data['ctime']
     self.mtime = data['mtime']
-    self.xattr = data['xattr']
+    self.osx_tags = data['osx_tags'] if data['osx_tags'].exists?
     self.mime_id = data['mime_id']
     self.kind_id = data['kind_id']
   end
@@ -193,7 +187,7 @@ end # FileDefinition
 
 class DirectoryDefinition
   
-  attr_accessor :path,:bytes,:ctime,:mtime,:xattr,:file_count,:item_count,:file_list
+  attr_accessor :path,:bytes,:ctime,:mtime,:file_count,:item_count,:osx_tags,:file_list
   
   def initialize(path, pseudofile)
     @path = path
@@ -201,7 +195,7 @@ class DirectoryDefinition
     @file_list = []
     @file_count = 0 
     @item_count = 1
-    @xattr = get_xattr(path)
+    @osx_tags = get_osx_tags(path) if /darwin/.match(RUBY_PLATFORM) # == osx
     unless pseudofile
       @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" unless $options[:silent]; "unavailable" )
       @mtime = File.mtime(path) rescue (puts "error getting modification time for directory #{path}" unless $options[:silent]; "unavailable" )
@@ -210,7 +204,7 @@ class DirectoryDefinition
   
   def as_json(options = { })
     p = sanitize_string(@path) rescue "path encoding broken" # there can be ArgumentError and UndefinedConversionError
-    return {
+    h = {
       "type" => "directory", 
       "path" => p, 
       "bytes" => bytes, 
@@ -218,9 +212,10 @@ class DirectoryDefinition
       'mtime' => mtime, 
       "file_count" => file_count, 
       "item_count" => item_count, 
-      'xattr' => xattr,
       "file_list" => file_list
     }
+    h["osx_tags"] = @osx_tags unless osx_tags.nil?
+    return h
   end
   
   def to_json(*a)
@@ -228,16 +223,9 @@ class DirectoryDefinition
   end
   
   def marshal_dump
-    return {
-      'path' => path, 
-      'bytes' => bytes, 
-      'ctime' => ctime, 
-      'mtime' => mtime, 
-      'file_count' => file_count, 
-      'item_count' => item_count, 
-      'xattr' => xattr,
-      'file_list' => file_list
-    }
+    h = self.to_json
+    h.delete("type")
+    return h
   end
 
   def marshal_load(data)
@@ -247,7 +235,7 @@ class DirectoryDefinition
     self.mtime = data['mtime']
     self.file_count = data['file_count']
     self.item_count = data['item_count']
-    self.xattr = data['xattr']
+    self.osx_tags = data['osx_tags'] if data['osx_tags'].exists?
     self.file_list = data['file_list']
   end
 end # DirectoryDefinition
@@ -324,23 +312,18 @@ def pretty_bytes_string(bytes)
   return "#{bytes} B"
 end
 
-def get_xattr(file_path)
-  case RUBY_PLATFORM
-  when /darwin/ # = osx
-    # array with the kMDItemUserTags strings 
-    # of the extended file attributes of 'path'
-    tags = %x{mdls -name 'kMDItemUserTags' -raw "#{file_path}"|tr -d "()\n"}.split(',').map { |tag| 
-      tag.strip.gsub(/"(.*?)"/,"\\1")
-    }
-    # if there are now tags, mdls returns "null" -> we don't want this
-    tags = [] if tags.length == 1 && tags[0]
-    return tags
-  #when /linux/
-  #when /bsd/
-  else
+def get_osx_tags(file_path)
+  # array with the kMDItemUserTags strings 
+  # of the extended file attributes of 'path'
+  tags = %x{mdls -name 'kMDItemUserTags' -raw "#{file_path}"|tr -d "()\n"}.split(',').map { |tag| 
+    tag.strip.gsub(/"(.*?)"/,"\\1")
+  }
+  # if there are now tags, mdls returns "null" -> we don't want this
+  if tags.length == 1 && tags[0] == "null"
     return []
+  else
+    return tags
   end
-  
 end
 
 #returns DirectoryDefinition object
