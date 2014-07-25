@@ -248,13 +248,15 @@ end # DirectoryDefinition
 
 class FsInventory
   
-  attr_accessor :kind_tab, :mime_tab, :file_structure, :timestamp
+  attr_accessor :file_structure, :timestamp, :kind_tab, :mime_tab, :osx_tab, :fshugo_tab
   
-  def initialize(kind_tab, mime_tab, file_structure)
-    @kind_tab = kind_tab
-    @mime_tab  = mime_tab
+  def initialize(file_structure, kind_tab, mime_tab, osx_tab, fshugo_tab)
     @file_structure = file_structure
     @timestamp = Time.now
+    @kind_tab = kind_tab
+    @mime_tab  = mime_tab
+    @osx_tab = osx_tab
+    @fshugo_tab = fshugo_tab
   end 
   
   def size
@@ -277,8 +279,10 @@ class FsInventory
     return {
       "timestamp" => timestamp,
       "file_structure" => file_structure,
-      "kind_tab" => kind_tab, 
-      "mime_tab" => mime_tab
+      "mime_tab" => mime_tab,
+      "kind_tab" => kind_tab,
+      "osx_tab" => osx_tab,
+      "fshugo_tab" => fshugo_tab
     }
   end
   
@@ -295,10 +299,12 @@ class FsInventory
   end
 
   def marshal_load(data)
-    self.kind_tab = data['kind_tab']
-    self.mime_tab = data['mime_tab']
     self.file_structure = data['file_structure']
     self.timestamp = data['timestamp']
+    self.kind_tab = data['kind_tab']
+    self.mime_tab = data['mime_tab']
+    self.osx_tab = data['osx_tab']
+    self.fshugo_tab = data['fshugo_tab']
   end
 end
 
@@ -328,14 +334,27 @@ def get_osx_tags(file_path)
   if tags.length == 1 && tags[0] == "null"
     return []
   else
-    return tags
+    tag_ids = []
+    tags.each do |tag|
+      $osx_tab.add(tag) unless $osx_tab.contains?(tag)
+      tag_ids << $osx_tab.get_id(tag)
+    end
+    return tag_ids
+    #return tags
   end
 end
 
 def get_fshugo_tags(file_path)
   xattr = Xattr.new(file_path)
   unless xattr["fshugo"].nil?
-    return xattr["fshugo"].split(";") 
+    tags = xattr["fshugo"].split(";") 
+    tag_ids = []
+    tags.each do |tag|
+      $fshugo_tab.add(tag) unless $fshugo_tab.contains?(tag)
+      tag_ids << $fshugo_tab.get_id(tag)
+    end
+    return tag_ids
+    #return tags
   else
     return []
   end 
@@ -580,15 +599,17 @@ if __FILE__ == $0
   end
 
   $fmagic = FileMagic.new 
-  $kind_tab = LookupTable.new # magic file descriptions
-  $mime_tab = LookupTable.new
+  $kind_tab   = LookupTable.new # magic file descriptions
+  $mime_tab   = LookupTable.new
+  $osx_tab    = LookupTable.new
+  $fshugo_tab = LookupTable.new
 
   file_structure = []
   ARGV.each do |basepath|
-      file_structure << parse(basepath)
+    file_structure << parse(basepath)
   end
 
-  inventory = FsInventory.new($kind_tab, $mime_tab, file_structure)
+  inventory = FsInventory.new(file_structure, $kind_tab, $mime_tab, $osx_tab, $fshugo_tab)
   
   unless $options[:silent]
     file_structure.each do |fs_tree|
