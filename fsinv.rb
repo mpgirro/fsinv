@@ -137,8 +137,8 @@ class FileDefinition
       #puts "crc32: #{crc32}"
       
       @md5 = Digest::MD5.file(@path).hexdigest if $options[:md5]
-      @osx_tags = get_osx_tags(path) if /darwin/.match(RUBY_PLATFORM) # == osx
-      @fshugo_tags = get_fshugo_tags(path)
+      @osx_tags = osx_tag_ids(path) if /darwin/.match(RUBY_PLATFORM) # == osx
+      @fshugo_tags = fshugo_tag_ids(path)
     else
       @mime_id = nil
       @kind_id = nil
@@ -198,8 +198,8 @@ class DirectoryDefinition
     @file_list = []
     @file_count = 0 
     @item_count = 0
-    @osx_tags = get_osx_tags(path) if /darwin/.match(RUBY_PLATFORM) # == osx
-    @fshugo_tags = get_fshugo_tags(path)
+    @osx_tags = osx_tag_ids(path) if /darwin/.match(RUBY_PLATFORM) # == osx
+    @fshugo_tags = fshugo_tag_ids(path)
     unless pseudofile
       @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" unless $options[:silent]; "unavailable" )
       @mtime = File.mtime(path) rescue (puts "error getting modification time for directory #{path}" unless $options[:silent]; "unavailable" )
@@ -324,7 +324,7 @@ def pretty_bytes_string(bytes)
   return "#{bytes} B"
 end
 
-def get_osx_tags(file_path)
+def osx_tag_ids(file_path)
   # array with the kMDItemUserTags strings 
   # of the extended file attributes of 'path'
   tags = %x{mdls -name 'kMDItemUserTags' -raw "#{file_path}"|tr -d "()\n"}.split(',').map { |tag| 
@@ -344,7 +344,7 @@ def get_osx_tags(file_path)
   end
 end
 
-def get_fshugo_tags(file_path)
+def fshugo_tag_ids(file_path)
   xattr = Xattr.new(file_path)
   unless xattr["fshugo"].nil?
     tags = xattr["fshugo"].split(";") 
