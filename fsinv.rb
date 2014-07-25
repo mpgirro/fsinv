@@ -42,8 +42,8 @@ class LookupTable
   
   def initialize
     @descr_map = Hash.new
-    @idcursor = 0
-    self.add("unavailable")
+    @idcursor = 1
+    #self.add("unavailable")
   end  
   
   def contains?(descr)
@@ -120,7 +120,7 @@ class FileDefinition
         $mime_tab.add(description) unless $mime_tab.contains?(description)
         @mime_id = $mime_tab.get_id(description)
       rescue ArgumentError # if this happens you should definitly repair some file names
-        @mime_id = 0
+        @mime_id = nil
       end
     
       begin 
@@ -129,7 +129,7 @@ class FileDefinition
         @kind_id = $kind_tab.get_id(description)
       rescue
         puts "error: file kind information unavailable" unless $options[:silent]
-        @kind_id = 0
+        @kind_id = nil
       end
       
       #crc32 = Digest::CRC32.file(@path).digest!.to_i.to_s(16)
@@ -140,8 +140,8 @@ class FileDefinition
       @osx_tags = get_osx_tags(path) if /darwin/.match(RUBY_PLATFORM) # == osx
       @fshugo_tags = get_fshugo_tags(path)
     else
-      @mime_id = 0
-      @kind_id = 0
+      @mime_id = nil
+      @kind_id = nil
     end
   end
   
@@ -152,10 +152,10 @@ class FileDefinition
       "path" => p,
       "bytes" => bytes, 
       'ctime' => ctime, 
-      'mtime' => mtime, 
-      "mime_id" => mime_id, 
-      "kind_id" => kind_id
+      'mtime' => mtime
     }
+    h["mime_id"] = mime_id unless mime_id.nil?
+    h["kind_id"] = kind_id unless kind_id.nil?
     h["md5"] = @md5 unless md5.nil?
     h["osx_tags"] = @osx_tags unless osx_tags.empty?
     h["fshugo_tags"] = @fshugo_tags unless @fshugo_tags.empty?
