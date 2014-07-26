@@ -43,30 +43,21 @@ class LookupTable
   def initialize
     @descr_map = Hash.new
     @idcursor = 1
-    #self.add("unavailable")
   end  
   
   def contains?(descr)
-    if descr == ""
-      return false
-    else
-      return @descr_map.has_value?(descr)
-    end
+    return descr == "" ? false : @descr_map.has_value?(descr)
   end
   
   def add(descr)
-    if descr != ""
+    unless descr == ""
       @descr_map[idcursor] = descr
       @idcursor += 1
     end
   end
   
   def get_id(descr)
-    if descr == ""
-      return 0
-    else
-      return @descr_map.key(descr)
-    end
+    return descr == "" ? 0 : @descr_map.key(descr)
   end
   
   def get_descr(id)
@@ -231,6 +222,7 @@ class DirectoryDefinition
     h = self.to_json
     h.delete("type")
     return h
+    
   end
 
   def marshal_load(data)
@@ -309,11 +301,10 @@ class FsInventory
 end
 
 def sanitize_string(string)
-  string = string.encode("UTF-16BE", :invalid=>:replace, :undef => :replace, :replace=>"?").encode("UTF-8")
-  string = string.gsub(/[\u0080-\u009F]/) {|x| x.getbyte(1).chr.force_encoding('windows-1252').encode('utf-8') }
-  pattern = /\"/
-  string = string.gsub(pattern, "\\\"") # escape double quotes in string
-  return string
+  return string.encode("UTF-16BE", :invalid=>:replace, :undef => :replace, :replace=>"?")
+               .encode("UTF-8")
+               .gsub(/[\u0080-\u009F]/) {|x| x.getbyte(1).chr.force_encoding('windows-1252').encode('utf-8') }
+               .gsub(/\"/, "\\\"") # escape double quotes in string
 end
 
 def pretty_bytes_string(bytes)
@@ -518,7 +509,7 @@ if __FILE__ == $0
     opts.banner = USAGE
     opts.separator ""
     opts.separator "Specific options:"
-
+    opts.separator ""
     opts.on("-a", "--all", "Save in all formats to the default destinations. 
                                      Equal to -b -j -q -x -y. Use -n to change the file names") do |all_flag|
       $options[:binary]  = true
@@ -527,58 +518,78 @@ if __FILE__ == $0
       $options[:xml]     = true
       $options[:yaml]    = true
     end
-  
-    opts.on("-b", "--binary [FILE]", "Dump iventory data stuctures in binary format. Default destination is #{DEFAULT_NAME}.bin") do |binary_file|
+    opts.separator ""
+    
+    opts.on("-b", "--binary [FILE]", "Dump iventory data stuctures in binary format. 
+                                     Default destination is #{DEFAULT_NAME}.bin") do |binary_file|
       $options[:binary] = true
       $options[:binary_file] = binary_file
     end
+    opts.separator ""
     
-    opts.on("-d", "--db [FILE]", "Save inventory as SQLite database. Default destination is #{DEFAULT_NAME}.db") do |sql_file|
+    opts.on("-d", "--db [FILE]", "Save inventory as SQLite database. 
+                                     Default destination is #{DEFAULT_NAME}.db") do |sql_file|
       $options[:db] = true
       $options[:db_file] = sql_file 
     end
+    opts.separator ""
   
     opts.on_tail("-h", "--help", "Show this message") do
       puts opts
       exit
     end
   
-    opts.on("-j", "--json [FILE]", "Save inventory in JSON file format. Default destination is #{DEFAULT_NAME}.json") do |json_file|
+    opts.on("-j", "--json [FILE]", "Save inventory in JSON file format. 
+                                     Default destination is #{DEFAULT_NAME}.json") do |json_file|
       $options[:json] = true
       $options[:json_file] = json_file
     end
+    opts.separator ""
     
     opts.on("-m", "--md5", "Calculate MD5 hashes for each file") do |md5|
       $options[:md5] = true
     end
+    opts.separator ""
   
-    opts.on("-n", "--name INV_NAME", "Name of the inventory. This will change the name of the output files. 
-                                     Default is '#{DEFAULT_NAME}'. Specific targets for file formats will overwrite this.") do |name|
+    opts.on("-n", "--name NAME", "This will change the name of the output files. 
+                                     Default is '#{DEFAULT_NAME}'. Specific targets for 
+                                     file formats will overwrite this.") do |name|
       $options[:name] = name
     end
+    opts.separator ""
   
     opts.on("-p", "--print FORMAT", [:json, :yaml, :xml], "Print a format to stdout (json|yaml|xml)") do |format|
       $options[:print] = true
       $options[:print_format] = format
     end
+    opts.separator ""
   
-    opts.on("-s", "--silent", "Run in silent mode. No output or non-critical error messages will be printed") do |s|
+    opts.on("-s", "--silent", "Run in silent mode. No output or non-critical 
+                                     error messages will be printed") do |s|
       $options[:silent] = s
     end
+    opts.separator ""
   
-    opts.on("-v", "--verbose", "Run verbosely. This will output processed filenames and error messages too") do |v|
+    opts.on("-v", "--verbose", "Run verbosely. This will output processed 
+                                     filenames and error messages too") do |v|
       $options[:verbose] = v
     end
+    opts.separator ""
   
-    opts.on("-x", "--xml [FILE]", "Save inventory in XML file format. Default destination is #{DEFAULT_NAME}.xml") do |xml_file|
+    opts.on("-x", "--xml [FILE]", "Save inventory in XML file format. 
+                                     Default destination is #{DEFAULT_NAME}.xml") do |xml_file|
       $options[:xml] = true
       $options[:xml_file] = xml_file 
     end
+    opts.separator ""
   
-    opts.on("-y", "--yaml [FILE]", "Save inventory in YAML file format. Default destination is #{DEFAULT_NAME}.yaml") do |yaml_file|
+    opts.on("-y", "--yaml [FILE]", "Save inventory in YAML file format. 
+                                     Default destination is #{DEFAULT_NAME}.yaml") do |yaml_file|
       $options[:yaml] = true
       $options[:yaml_file] = yaml_file
     end
+    opts.separator ""
+    
   end.parse! # do the parsing. do it now!
 
   #p $options
@@ -591,7 +602,7 @@ if __FILE__ == $0
   end
 
   ARGV.each do |arg|
-    if !File.directory?(arg)
+    unless File.directory?(arg)
       puts "Not a directory: #{arg}"
       puts USAGE
       exit
@@ -641,6 +652,7 @@ if __FILE__ == $0
     
     begin
       require 'json'
+      
       # monkey-patch for "JSON::NestingError: nesting is too deep"
       module JSON
         class << self
@@ -669,11 +681,12 @@ if __FILE__ == $0
 
   if $options[:yaml]
     if $options[:yaml_file].nil?
-      if $options[:name].nil?
-        $options[:yaml_file] = "#{DEFAULT_NAME}.yaml"
-      else 
-        $options[:yaml_file] = "#{$options[:name]}.yaml"
-      end
+      $options[:yaml_file] = 
+        if $options[:name].nil?
+          "#{DEFAULT_NAME}.yaml"
+        else
+          "#{$options[:name]}.yaml"
+        end
     end
     puts "writing YAML to #{$options[:yaml_file]}" unless $options[:silent]
     yaml_data = inventory_to_yaml(inventory)
@@ -691,11 +704,12 @@ if __FILE__ == $0
   
   if $options[:binary]
     if $options[:binary_file].nil?
-      if $options[:name].nil?
-        $options[:binary_file] = "#{DEFAULT_NAME}.bin"
-      else 
-        $options[:binary_file] = "#{$options[:name]}.bin"
-      end
+      $options[:binary_file] = 
+        if $options[:name].nil?
+          "#{DEFAULT_NAME}.bin"
+        else
+          "#{$options[:name]}.bin"
+        end
     end
     puts "writing binary dump to #{$options[:binary_file]}" unless $options[:silent]
     begin
@@ -710,11 +724,12 @@ if __FILE__ == $0
   
   if $options[:db]
     if $options[:db_file].nil?
-      if $options[:name].nil?
-        $options[:db_file] = "#{DEFAULT_NAME}.db"
-      else 
-        $options[:db_file] = "#{$options[:name]}.db"
-      end
+      $options[:db_file] = 
+        if $options[:name].nil?
+          "#{DEFAULT_NAME}.db"
+        else
+          "#{$options[:name]}.db"
+        end
     end
 
     puts "writing SQL dump to #{$options[:db_file]}" unless $options[:silent]
@@ -752,11 +767,12 @@ if __FILE__ == $0
 
   if $options[:xml]
     if $options[:xml_file].nil?
-      if $options[:name].nil?
-        $options[:xml_file] = "#{DEFAULT_NAME}.xml"
-      else 
-        $options[:xml_file] = "#{$options[:name]}.xml"
-      end
+      $options[:xml_file] = 
+        if $options[:name].nil?
+          "#{DEFAULT_NAME}.xml"
+        else
+          "#{$options[:name]}.xml"
+        end
     end
     puts "writing XML to #{$options[:xml_file]}" unless $options[:silent]
     xml_data = inventory_to_xml(inventory)
@@ -772,16 +788,13 @@ if __FILE__ == $0
     end
   end
   
-  if $options[:print] 
-    print_data = nil
-    case $options[:print_format] 
-    when :json
-      print_data = inventory_to_json(inventory)
-    when :xml
-      print_data = inventory_to_xml(inventory)
-    when :yaml
-      print_data = inventory_to_yaml(inventory)
-    end
+  if $options[:print]  
+    print_data = case $options[:print_format] 
+                 when :json then inventory_to_json(inventory)
+                 when :xml then inventory_to_xml(inventory)
+                 when :yaml then inventory_to_yaml(inventory)
+                 else nil
+                 end
     puts print_data unless print_data.nil?
   end
 
