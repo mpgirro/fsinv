@@ -423,6 +423,89 @@ def parse(folder_path, reduced_scan = false)
   return curr_dir
 end # parse()
 
+
+
+def filestructure_to_sqlite(db,defobj,parent_rowid)
+  rowcursor = parent_rowid
+  case defobj
+  when DirectoryDefinition
+    db.execute("INSERT INTO directory(path, bytes, ctime, mtime, file_count, item_count, parent) 
+                VALUES ('#{defobj.path}', #{defobj.bytes}, '#{defobj.ctime}', '#{defobj.mtime}', 
+                #{defobj.file_count}, #{defobj.item_count},#{parent_rowid})")
+    new_parent_rowid = db.execute("SELECT last_insert_rowid() AS rowid").first.first # returns a 2-dim array   
+    defobj.file_list.each do |child|
+      rowid = filestructure_to_sqlite(db,child,new_parent_rowid)
+      rowcursor = rowid if rowid > rowcursor
+    end
+  when FileDefinition
+    db.execute("INSERT INTO file(path, bytes, ctime, mtime, mimetype, magicdescr, parent) 
+                VALUES ('#{defobj.path}',#{defobj.bytes}, '#{defobj.ctime}',
+                '#{defobj.mtime}',#{defobj.mimetype},#{defobj.magicdescr},#{parent_rowid})")
+  end
+  return rowcursor
+end
+
+def filestructure_to_db(structitem)
+    
+  h = {
+    :path => structitem.path,
+    :bytes => structitem.bytes,
+    :ctime => structitem.ctime,
+    :mtime => structitem.mtime
+  }
+  
+  case structitem
+  when DirectoryDefinition
+    h[:entity_type] = "directory"
+    h[:file_count] = structitem.file_count
+    h[:item_count] = structitem.item_count
+  when FileDefinition
+    h[:entity_type] = "file"
+    mime_descr = $mime_tab.get_value(structitem.mimetype)
+    mime_id = MimeType.where(:mimetype => mime_descr).ids.first
+    h[:mimetype] = mime_id
+    
+    magic_descr = $magic_tab.get_value(structitem.magicdescr)
+    magic_id = MagicDescription.where(:magicdescr => magic_descr).ids.first
+    h[:magicdescr] = magic_id
+  end
+  
+  osx_tags = [] # will be array of db ids
+  unless structitem.osx_tags.nil?
+    structitem.osx_tags.each do |json_id|
+      tag = $osx_tab.get_value(json_id)
+      osx_tags << OsxTag.where(:tag => tag).ids.first
+    end
+  end
+  h[:osx_tags] = osx_tags
+  
+  fshugo_tags = [] # will be array of db ids
+  unless structitem.fshugo_tags.nil?
+    structitem.fshugo_tags.each do |json_id|
+      tag = $fshugo_tab.get_value(json_id)
+      fshugo_tags << FshugoTag.where(:tag => tag).ids.first
+    end
+  end
+  h[:fshugo_tags] = fshugo_tags
+  
+  FileStructure.create(h)
+  
+  structitem.file_list.each { |child| filestructure_to_db(child) } if h[:entity_type] == "directory" 
+  
+end
+
+def inventory_to_json(inventory)
+  json_data = nil
+  begin 
+    #require 'json'
+    json_data = JSON.parse(inventory.to_json(max_nesting: 100))
+    json_data = JSON.pretty_generate(json_data, :max_nesting => 100) 
+  rescue LoadError
+    puts "gem 'json' needed for JSON creation. Install using 'gem install json'"
+  end
+  return json_data
+end
+
 def filestructure_to_xml(xml, defobj)
   case defobj
   when DirectoryDefinition
@@ -445,38 +528,6 @@ def filestructure_to_xml(xml, defobj)
       xml.magicdescr(defobj.magicdescr)
     }
   end 
-end
-
-def filestructure_to_sqlite(db,defobj,parent_rowid)
-  rowcursor = parent_rowid
-  case defobj
-  when DirectoryDefinition
-    db.execute("INSERT INTO directory(path, bytes, ctime, mtime, file_count, item_count, parent) 
-                VALUES ('#{defobj.path}', #{defobj.bytes}, '#{defobj.ctime}', '#{defobj.mtime}', 
-                #{defobj.file_count}, #{defobj.item_count},#{parent_rowid})")
-    new_parent_rowid = db.execute("SELECT last_insert_rowid() AS rowid").first.first # returns a 2-dim array   
-    defobj.file_list.each do |child|
-      rowid = filestructure_to_sqlite(db,child,new_parent_rowid)
-      rowcursor = rowid if rowid > rowcursor
-    end
-  when FileDefinition
-    db.execute("INSERT INTO file(path, bytes, ctime, mtime, mimetype, magicdescr, parent) 
-                VALUES ('#{defobj.path}',#{defobj.bytes}, '#{defobj.ctime}',
-                '#{defobj.mtime}',#{defobj.mimetype},#{defobj.magicdescr},#{parent_rowid})")
-  end
-  return rowcursor
-end
-
-def inventory_to_json(inventory)
-  json_data = nil
-  begin 
-    #require 'json'
-    json_data = JSON.parse(inventory.to_json(max_nesting: 100))
-    json_data = JSON.pretty_generate(json_data, :max_nesting => 100) 
-  rescue LoadError
-    puts "gem 'json' needed for JSON creation. Install using 'gem install json'"
-  end
-  return json_data
 end
 
 def inventory_to_xml(inventory)
@@ -540,22 +591,28 @@ if __FILE__ == $0
     opts.separator ""
     opts.separator "Files additionally have their mime type, magic file description (see 'man file'),"
     opts.separator "OSX Finder tags (kMDItemUserTags) if run on osx, and a special 'fshugo' extended"
-    opts.separator "file attribute (used by https://github.com/mpgirro/fshugo) stored as well. "
+    opts.separator "file attribute (used by https://github.com/mpgirro/fshugo) stored as well."
     opts.separator ""
     opts.separator "Directories have also their xattr (osx, fshugo) stored, as well as a count of their"
     opts.separator "direct children files (file_count), direct children directories (dir_count) and a"
     opts.separator "general children item count (all dir/item count throughout their descendent hierarchie"
     opts.separator "tree)"
     opts.separator ""
+    opts.separator "Multiple file system hierarchie trees can be indexed simultaniously, by using more than"
+    opts.separator "one basepath (see the usage)"
+    opts.separator ""
     opts.separator "Note that some files are ignored (like .AppleDouble, .DS_Store, Thumbs.db, etc.)"
-    opts.separator "Additionally, some directories will only have reduced indizes, for their content"
-    opts.separator "is huge of files, yet they are of lesser interest (like .git, .wine, etc.)"
+    opts.separator "Additionally, some directories will only have reduced indizes (e.g. only their byte size,"
+    opts.separator "yet no children file list), for their content is huge of files, yet they are of lesser"
+    opts.separator "interest (like .git, .wine, etc.)"
+    opts.separator ""
     opts.separator "On OSX system, some items appear as files yet are in fact directories (.app, .bundle)"
-    opts.separator "They will be marked as directories, but will only have their size calculated. Their"
+    opts.separator "They will be marked as directories, but will only have their sizes calculated. Their"
     opts.separator "inner file hierarchie is also of lesser interrest."
     opts.separator ""
     opts.separator "Specific options:"
     opts.separator ""
+    
     opts.on("-a", "--all", "Save in all formats to the default destinations. 
                                      Equal to -b -j -q -x -y. Use -n to change the 
                                      file names of all target at once") do |all_flag|
@@ -598,7 +655,7 @@ if __FILE__ == $0
     end
     opts.separator ""
     
-    opts.on("-m", "--md5", "Calculate MD5 hashes for each file") do |md5|
+    opts.on("-m", "--md5", "Calculate MD5 hash for each file") do |md5|
       $options[:md5] = true
     end
     opts.separator ""
@@ -805,36 +862,90 @@ if __FILE__ == $0
         end
     end
 
-    puts "writing SQL dump to #{$options[:db_file]}" unless $options[:silent]
+    puts "writing database dump to #{$options[:db_file]}" unless $options[:silent]
     `rm #{$options[:db_file]}`
 
     begin
-      require 'sqlite3'
-      db = SQLite3::Database.new("#{$options[:db_file]}")
-      db.execute "CREATE TABLE IF NOT EXISTS mime_tab(id INTEGER PRIMARY KEY, description TEXT)"
-      db.execute "CREATE TABLE IF NOT EXISTS magic_tab(id INTEGER PRIMARY KEY, description TEXT)"
-      db.execute "CREATE TABLE IF NOT EXISTS directory(id INTEGER PRIMARY KEY, path TEXT, 
-                  bytes INTEGER, ctime TEXT, mtime TEXT, file_count INTEGER, item_count INTEGER, 
-                  parent REFERENCES directory(rowid))" # rowid is an implicid column of sqlite
-      db.execute "CREATE TABLE IF NOT EXISTS file(id INTEGER PRIMARY KEY, path TEXT, 
-                  bytes INTEGER, ctime TEXT, mtime TEXT, mimetype REFERENCES mime_tab(id), 
-                  magicdescr REFERENCES magic_tab(id), parent REFERENCES directory(rowid))" # rowid is an implicid column of sqlite
-                  
-      inventory.mime_tab.val_map.each { |id, descr| db.execute("INSERT INTO mime_tab(id,description) VALUES (#{id},'#{descr}')") }
-      inventory.magic_tab.val_map.each { |id, descr| db.execute("INSERT INTO magic_tab(id,description) VALUES (#{id},'#{descr}')") }
       
-      rowid = 1
-      inventory.file_structure.each do |fstruct|
-        rowid = filestructure_to_sqlite(db, fstruct, rowid) # sqlite indizes start with 1
-        rowid += 1 # start with a new root - make a rowid not used yet
+      require 'active_record'
+
+      ActiveRecord::Base.establish_connection(
+          :adapter => "sqlite3",
+          :database  => $options[:db_file]
+      )
+      
+      ActiveRecord::Schema.define do
+
+        create_table :file_structures, force: true do |t|
+          t.datetime :created_at
+          t.datetime :updated_at
+          t.string   :path
+          t.integer  :bytes
+          t.datetime :ctime
+          t.datetime :mtime
+          t.string   :entity_type
+          t.integer  :file_count
+          t.integer  :item_count
+          t.string   :osx_tags
+          t.string   :fshugo_tags
+          t.integer  :mimetype
+          t.integer  :magicdescr
+        end
+
+        create_table :fshugo_tags, force: true do |t|
+          t.string :tag
+        end
+
+        create_table :magic_descriptions, force: true do |t|
+          t.string :magicdescr
+        end
+
+        create_table :mime_types, force: true do |t|
+          t.string :mimetype
+        end
+
+        create_table :osx_tags, force: true do |t|
+          t.string :tag
+        end
+
       end
+      
+      class MimeType < ActiveRecord::Base
+        attr_accessor :mimetype
+      end
+ 
+      class MagicDescription < ActiveRecord::Base
+        attr_accessor :magicdescr
+      end
+      
+      class FshugoTag < ActiveRecord::Base
+        attr_accessor :tag
+      end
+      
+      class OsxTag < ActiveRecord::Base
+        attr_accessor :tag
+      end
+      
+      class FileStructure < ActiveRecord::Base
+        attr_accessor :path, :bytes, :ctime, :mtime, :entity_type
+        attr_accessor :file_count, :item_count # used if referencing a directory
+        attr_accessor :mimetype, :magicdescr # used if referencing a file
+        attr_accessor :osx_tags, :fshugo_tags
+  
+        serialize :osx_tags,Array    # tags is text type, make it behave like an array
+        serialize :fshugo_tags,Array # tags is text type, make it behave like an array  
+      end
+      
+      inventory.mime_tab.val_map.each { |id, val| MimeType.create(:mimetype => val) }
+      inventory.magic_tab.val_map.each { |id, val| MagicDescription.create(:magicdescr => val) }
+      inventory.fshugo_tab.val_map.each { |id, val| FshugoTag.create(:tag => val) }
+      inventory.osx_tab.val_map.each { |id, val| OsxTag.create(:tag => val) }
+      inventory.file_structure.each { |fstruct| filestructure_to_db(fstruct) }
       
     rescue SQLite3::Exception => e 
         puts e
     rescue LoadError
-      puts "gem 'sqlite3' needed for SQLite DB creation. Install using 'gem install sqlite3'"
-    ensure
-        db.close unless db.nil?
+      puts "gem 'active_record' needed for DB creation. Install using 'gem install active_record'"
     end
   end
 
@@ -864,7 +975,7 @@ if __FILE__ == $0
   if $options[:print]  
     print_data = case $options[:print_format] 
                  when :json then inventory_to_json(inventory)
-                 when :xml then inventory_to_xml(inventory)
+                 when :xml  then inventory_to_xml(inventory)
                  when :yaml then inventory_to_yaml(inventory)
                  else nil
                  end
