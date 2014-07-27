@@ -1,6 +1,6 @@
 # fsinv: file system inventory tool
 
-imagine a very detailed here (please?)
+imagine a very detailed README message here (please?)
 
 ## Usage
 
