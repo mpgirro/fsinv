@@ -8,7 +8,7 @@ begin
   require 'filemagic'
 rescue
   puts "gem 'filemagic' required. Install using 'gem install ruby-filemagic'"
-  puts "If you have trouble on OSX you may ned to run 'brew install libmagic' before"
+  puts "If you have trouble on OSX you may need to run 'brew install libmagic' before"
   exit
 end
 require 'pathname'
@@ -95,7 +95,7 @@ end # LookupTable
 
 class FileDefinition
   
-  attr_accessor :path,:bytes,:ctime,:mtime,:mime_id,:kind_id,:md5,:osx_tags,:fshugo_tags
+  attr_accessor :path,:bytes,:ctime,:mtime,:mimetype,:magicdescr,:md5,:osx_tags,:fshugo_tags
   
   def initialize(path, typecheck = true)
     @path = path
@@ -107,20 +107,20 @@ class FileDefinition
     
       begin
         #@mime = `file -b --mime #{path}`
-        description = MIME::Types.type_for(@path).join(', ')
-        $mime_tab.add(description) unless $mime_tab.contains?(description)
-        @mime_id = $mime_tab.get_id(description)
+        type_str = MIME::Types.type_for(@path).join(', ')
+        $mime_tab.add(type_str) unless $mime_tab.contains?(type_str)
+        @mimetype = $mime_tab.get_id(type_str)
       rescue ArgumentError # if this happens you should definitly repair some file names
-        @mime_id = nil
+        @mimetype = nil
       end
     
       begin 
         description = sanitize_string($fmagic.file(@path))
-        $kind_tab.add(description) unless $kind_tab.contains?(description)
-        @kind_id = $kind_tab.get_id(description)
+        $magic_tab.add(description) unless $magic_tab.contains?(description)
+        @magicdescr = $magic_tab.get_id(description)
       rescue
         puts "error: file kind information unavailable" unless $options[:silent]
-        @kind_id = nil
+        @magicdescr = nil
       end
       
       #crc32 = Digest::CRC32.file(@path).digest!.to_i.to_s(16)
@@ -131,8 +131,8 @@ class FileDefinition
       @osx_tags = osx_tag_ids(path) if /darwin/.match(RUBY_PLATFORM) # == osx
       @fshugo_tags = fshugo_tag_ids(path)
     else
-      @mime_id = nil
-      @kind_id = nil
+      @mimetype = nil
+      @magicdescr = nil
     end
   end
   
@@ -145,8 +145,8 @@ class FileDefinition
       'ctime' => ctime, 
       'mtime' => mtime
     }
-    h["mime_id"] = mime_id unless mime_id.nil?
-    h["kind_id"] = kind_id unless kind_id.nil?
+    h["mimetype"] = mimetype unless mimetype.nil?
+    h["magicdescr"] = magicdescr unless magicdescr.nil?
     h["md5"] = @md5 unless md5.nil?
     h["osx_tags"] = @osx_tags unless osx_tags.empty?
     h["fshugo_tags"] = @fshugo_tags unless @fshugo_tags.empty?
@@ -174,8 +174,8 @@ class FileDefinition
     self.mtime = data['mtime']
     self.osx_tags = data['osx_tags'] if data['osx_tags'].exists?
     self.fshugo_tags = data['fshugo_tags'] if data['fshugo_tags'].exists?
-    self.mime_id = data['mime_id']
-    self.kind_id = data['kind_id']
+    self.mimetype = data['mimetype']
+    self.magicdescr = data['magicdescr']
   end
 end # FileDefinition
 
@@ -240,12 +240,12 @@ end # DirectoryDefinition
 
 class FsInventory
   
-  attr_accessor :file_structure, :timestamp, :kind_tab, :mime_tab, :osx_tab, :fshugo_tab
+  attr_accessor :file_structure, :timestamp, :magic_tab, :mime_tab, :osx_tab, :fshugo_tab
   
-  def initialize(file_structure, kind_tab, mime_tab, osx_tab, fshugo_tab)
+  def initialize(file_structure, magic_tab, mime_tab, osx_tab, fshugo_tab)
     @file_structure = file_structure
     @timestamp = Time.now
-    @kind_tab = kind_tab
+    @magic_tab = magic_tab
     @mime_tab  = mime_tab
     @osx_tab = osx_tab
     @fshugo_tab = fshugo_tab
@@ -272,7 +272,7 @@ class FsInventory
       "timestamp" => timestamp,
       "file_structure" => file_structure,
       "mime_tab" => mime_tab,
-      "kind_tab" => kind_tab,
+      "magic_tab" => magic_tab,
       "osx_tab" => osx_tab,
       "fshugo_tab" => fshugo_tab
     }
@@ -293,7 +293,7 @@ class FsInventory
   def marshal_load(data)
     self.file_structure = data['file_structure']
     self.timestamp = data['timestamp']
-    self.kind_tab = data['kind_tab']
+    self.magic_tab = data['magic_tab']
     self.mime_tab = data['mime_tab']
     self.osx_tab = data['osx_tab']
     self.fshugo_tab = data['fshugo_tab']
@@ -414,8 +414,8 @@ def filestructure_to_xml(xml, defobj)
     xml.file{
       xml.path(defobj.path)
       xml.bytes(defobj.bytes)
-      xml.mime_id(defobj.mime_id)
-      xml.kind_id(defobj.kind_id)
+      xml.mimetype(defobj.mimetype)
+      xml.magicdescr(defobj.magicdescr)
     }
   end 
 end
@@ -433,9 +433,9 @@ def filestructure_to_sqlite(db,defobj,parent_rowid)
       rowcursor = rowid if rowid > rowcursor
     end
   when FileDefinition
-    db.execute("INSERT INTO file(path, bytes, ctime, mtime, mime_id, kind_id, parent) 
+    db.execute("INSERT INTO file(path, bytes, ctime, mtime, mimetype, magicdescr, parent) 
                 VALUES ('#{defobj.path}',#{defobj.bytes}, '#{defobj.ctime}',
-                '#{defobj.mtime}',#{defobj.mime_id},#{defobj.kind_id},#{parent_rowid})")
+                '#{defobj.mtime}',#{defobj.mimetype},#{defobj.magicdescr},#{parent_rowid})")
   end
   return rowcursor
 end
@@ -459,8 +459,8 @@ def inventory_to_xml(inventory)
     builder = Nokogiri::XML::Builder.new do |xml| 
       xml.inventory{
         #output the magic tab
-        xml.kind_tab{
-          inventory.kind_tab.val_map.each{ |id, descr|
+        xml.magic_tab{
+          inventory.magic_tab.val_map.each{ |id, descr|
             xml.item{
               xml.id(id)
               xml.description(descr)
@@ -610,7 +610,7 @@ if __FILE__ == $0
   end
 
   $fmagic = FileMagic.new 
-  $kind_tab   = LookupTable.new # magic file descriptions
+  $magic_tab   = LookupTable.new # magic file descriptions
   $mime_tab   = LookupTable.new
   $osx_tab    = LookupTable.new
   $fshugo_tab = LookupTable.new
@@ -620,7 +620,7 @@ if __FILE__ == $0
     file_structure << parse(basepath)
   end
 
-  inventory = FsInventory.new(file_structure, $kind_tab, $mime_tab, $osx_tab, $fshugo_tab)
+  inventory = FsInventory.new(file_structure, $magic_tab, $mime_tab, $osx_tab, $fshugo_tab)
   
   unless $options[:silent]
     file_structure.each do |fs_tree|
@@ -739,16 +739,16 @@ if __FILE__ == $0
       require 'sqlite3'
       db = SQLite3::Database.new("#{$options[:db_file]}")
       db.execute "CREATE TABLE IF NOT EXISTS mime_tab(id INTEGER PRIMARY KEY, description TEXT)"
-      db.execute "CREATE TABLE IF NOT EXISTS kind_tab(id INTEGER PRIMARY KEY, description TEXT)"
+      db.execute "CREATE TABLE IF NOT EXISTS magic_tab(id INTEGER PRIMARY KEY, description TEXT)"
       db.execute "CREATE TABLE IF NOT EXISTS directory(id INTEGER PRIMARY KEY, path TEXT, 
                   bytes INTEGER, ctime TEXT, mtime TEXT, file_count INTEGER, item_count INTEGER, 
                   parent REFERENCES directory(rowid))" # rowid is an implicid column of sqlite
       db.execute "CREATE TABLE IF NOT EXISTS file(id INTEGER PRIMARY KEY, path TEXT, 
-                  bytes INTEGER, ctime TEXT, mtime TEXT, mime_id REFERENCES mime_tab(id), 
-                  kind_id REFERENCES kind_tab(id), parent REFERENCES directory(rowid))" # rowid is an implicid column of sqlite
+                  bytes INTEGER, ctime TEXT, mtime TEXT, mimetype REFERENCES mime_tab(id), 
+                  magicdescr REFERENCES magic_tab(id), parent REFERENCES directory(rowid))" # rowid is an implicid column of sqlite
                   
       inventory.mime_tab.val_map.each { |id, descr| db.execute("INSERT INTO mime_tab(id,description) VALUES (#{id},'#{descr}')") }
-      inventory.kind_tab.val_map.each { |id, descr| db.execute("INSERT INTO kind_tab(id,description) VALUES (#{id},'#{descr}')") }
+      inventory.magic_tab.val_map.each { |id, descr| db.execute("INSERT INTO magic_tab(id,description) VALUES (#{id},'#{descr}')") }
       
       rowid = 1
       inventory.file_structure.each do |fstruct|
