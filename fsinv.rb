@@ -535,10 +535,30 @@ if __FILE__ == $0
   OptionParser.new do |opts|
     opts.banner = USAGE
     opts.separator ""
+    opts.separator "fsinv is used to index file systems. By default for each file/directory the size"
+    opts.separator "in bytes as well as creation time (ctime) and modification time (mtime) are indexed."
+    opts.separator ""
+    opts.separator "Files additionally have their mime type, magic file description (see 'man file'),"
+    opts.separator "OSX Finder tags (kMDItemUserTags) if run on osx, and a special 'fshugo' extended"
+    opts.separator "file attribute (used by https://github.com/mpgirro/fshugo) stored as well. "
+    opts.separator ""
+    opts.separator "Directories have also their xattr (osx, fshugo) stored, as well as a count of their"
+    opts.separator "direct children files (file_count), direct children directories (dir_count) and a"
+    opts.separator "general children item count (all dir/item count throughout their descendent hierarchie"
+    opts.separator "tree)"
+    opts.separator ""
+    opts.separator "Note that some files are ignored (like .AppleDouble, .DS_Store, Thumbs.db, etc.)"
+    opts.separator "Additionally, some directories will only have reduced indizes, for their content"
+    opts.separator "is huge of files, yet they are of lesser interest (like .git, .wine, etc.)"
+    opts.separator "On OSX system, some items appear as files yet are in fact directories (.app, .bundle)"
+    opts.separator "They will be marked as directories, but will only have their size calculated. Their"
+    opts.separator "inner file hierarchie is also of lesser interrest."
+    opts.separator ""
     opts.separator "Specific options:"
     opts.separator ""
     opts.on("-a", "--all", "Save in all formats to the default destinations. 
-                                     Equal to -b -j -q -x -y. Use -n to change the file names") do |all_flag|
+                                     Equal to -b -j -q -x -y. Use -n to change the 
+                                     file names of all target at once") do |all_flag|
       $options[:binary]  = true
       $options[:json]    = true
       $options[:db]      = true
