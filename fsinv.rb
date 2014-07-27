@@ -38,36 +38,36 @@ $PSEUDO_FILES = ['.app','.bundle','.mbox','.plugin','.sparsebundle']
 
 class LookupTable
   
-  attr_accessor :descr_map, :idcursor
+  attr_accessor :val_map, :idcursor
   
   def initialize
-    @descr_map = Hash.new
+    @val_map = Hash.new
     @idcursor = 1
   end  
   
   def contains?(descr)
-    return descr == "" ? false : @descr_map.has_value?(descr)
+    return descr == "" ? false : @val_map.has_value?(descr)
   end
   
   def add(descr)
     unless descr == ""
-      @descr_map[idcursor] = descr
+      @val_map[idcursor] = descr
       @idcursor += 1
     end
   end
   
   def get_id(descr)
-    return descr == "" ? 0 : @descr_map.key(descr)
+    return descr == "" ? 0 : @val_map.key(descr)
   end
   
-  def get_descr(id)
-    return @descr_map[id]
+  def get_value(id)
+    return @val_map[id]
   end
   
   def to_a
     table_arr = []
-    @descr_map.each do | id, descr | 
-      table_arr << {"id" => id, "description" => descr}
+    @val_map.each do | id, val | 
+      table_arr << {"id" => id, "value" => val}
     end
     return table_arr
   end
@@ -82,13 +82,13 @@ class LookupTable
   
   def marshal_dump
     return {
-      'descr_map' => descr_map, 
+      'val_map' => val_map, 
       'idcursor' => idcursor
     }
   end
 
   def marshal_load(data)
-    self.descr_map = data['descr_map']
+    self.val_map = data['val_map']
     self.idcursor = data['idcursor']
   end
 end # LookupTable
@@ -460,14 +460,14 @@ def inventory_to_xml(inventory)
       xml.inventory{
         #output the magic tab
         xml.kind_tab{
-          inventory.kind_tab.descr_map.each{ |id, descr|
+          inventory.kind_tab.val_map.each{ |id, descr|
             xml.item{
               xml.id(id)
               xml.description(descr)
         } } }
         #ouput the mime tab
         xml.mime_tab{
-          inventory.mime_tab.descr_map.each{ |id, descr|
+          inventory.mime_tab.val_map.each{ |id, descr|
             xml.item{
               xml.id(id)
               xml.description(descr)
@@ -747,8 +747,8 @@ if __FILE__ == $0
                   bytes INTEGER, ctime TEXT, mtime TEXT, mime_id REFERENCES mime_tab(id), 
                   kind_id REFERENCES kind_tab(id), parent REFERENCES directory(rowid))" # rowid is an implicid column of sqlite
                   
-      inventory.mime_tab.descr_map.each { |id, descr| db.execute("INSERT INTO mime_tab(id,description) VALUES (#{id},'#{descr}')") }
-      inventory.kind_tab.descr_map.each { |id, descr| db.execute("INSERT INTO kind_tab(id,description) VALUES (#{id},'#{descr}')") }
+      inventory.mime_tab.val_map.each { |id, descr| db.execute("INSERT INTO mime_tab(id,description) VALUES (#{id},'#{descr}')") }
+      inventory.kind_tab.val_map.each { |id, descr| db.execute("INSERT INTO kind_tab(id,description) VALUES (#{id},'#{descr}')") }
       
       rowid = 1
       inventory.file_structure.each do |fstruct|
