@@ -99,11 +99,11 @@ class FileDefinition
   
   def initialize(path, typecheck = true)
     @path = path
-    @bytes = File.size(@path) rescue (puts "error: exception getting size for file #{path}" unless $options[:silent]; 0)
+    @bytes = File.size(@path) rescue (puts "error: exception getting size for file #{path}" if $options[:verbose]; 0)
     
     if typecheck
-      @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" unless $options[:silent]; "unavailable" )
-      @mtime = File.mtime(path) rescue (puts "error getting modification time for directory #{path}" unless $options[:silent]; "unavailable" )
+      @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" if $options[:verbose]; "unavailable" )
+      @mtime = File.mtime(path) rescue (puts "error getting modification time for directory #{path}" if $options[:verbose]; "unavailable" )
     
       begin
         #@mime = `file -b --mime #{path}`
@@ -192,8 +192,8 @@ class DirectoryDefinition
     @osx_tags = osx_tag_ids(path) if /darwin/.match(RUBY_PLATFORM) # == osx
     @fshugo_tags = fshugo_tag_ids(path)
     unless pseudofile
-      @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" unless $options[:silent]; "unavailable" )
-      @mtime = File.mtime(path) rescue (puts "error getting modification time for directory #{path}" unless $options[:silent]; "unavailable" )
+      @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" if $options[:verbose]; "unavailable" )
+      @mtime = File.mtime(path) rescue (puts "error getting modification time for directory #{path}" if $options[:verbose]; "unavailable" )
     end
   end
   
