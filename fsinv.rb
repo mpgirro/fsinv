@@ -13,8 +13,6 @@ rescue
 end
 require 'pathname'
 require 'optparse'
-require 'digest/md5'
-#require 'digest/crc32'
 require 'ffi-xattr'
 
 # Kibibyte, Mebibyte, Gibibyte, etc... 
@@ -95,18 +93,29 @@ end # LookupTable
 
 class FileDefinition
   
-  attr_accessor :path,:bytes,:ctime,:mtime,:mimetype,:magicdescr,:md5,:osx_tags,:fshugo_tags
+  attr_accessor :path,:bytes,:ctime,:mtime,:mimetype,:magicdescr,:crc32,:md5,:osx_tags,:fshugo_tags
   
-  def initialize(path, typecheck = true)
+  def initialize(path, reduced_scan = false)
     @path = path
     @bytes = File.size(@path) rescue (puts "error: exception getting size for file #{path}" if $options[:verbose]; 0)
     
-    if typecheck
-      @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" if $options[:verbose]; "unavailable" )
-      @mtime = File.mtime(path) rescue (puts "error getting modification time for directory #{path}" if $options[:verbose]; "unavailable" )
-    
+    unless reduced_scan # don't do this if we only want to know file sizes (for pseudofiles, .git folders, etc)
+      
+      begin 
+        @ctime = File.ctime(path) 
+      rescue
+        puts "error getting creation time for file #{path}" if $options[:verbose]
+        @ctime = "unavailable"
+      end
+      
+      begin 
+        @mtime = File.ctime(path) 
+      rescue
+        puts "error getting modification time for file #{path}" if $options[:verbose]
+        @mtime = "unavailable"
+      end
+
       begin
-        #@mime = `file -b --mime #{path}`
         type_str = MIME::Types.type_for(@path).join(', ')
         $mime_tab.add(type_str) unless $mime_tab.contains?(type_str)
         @mimetype = $mime_tab.get_id(type_str)
@@ -123,16 +132,31 @@ class FileDefinition
         @magicdescr = nil
       end
       
-      #crc32 = Digest::CRC32.file(@path).digest!.to_i.to_s(16)
-      #crc32 = Digest::CRC32.file(@path).hexdigest!
-      #puts "crc32: #{crc32}"
+      if $options[:crc32]
+        begin
+          @crc32 = Digest::CRC32.file(@path).hexdigest
+        rescue
+          puts "error calculating crc32 for #{path}" if $options[:verbose]
+          @crc32 = "error during calculation"
+        end
+      end
+
+      if $options[:md5]
+        begin
+          @crc32 = Digest::MD5.file(@path).hexdigest
+        rescue
+          puts "error calculating md5 for #{path}" if $options[:verbose]
+          @crc32 = "error during calculation"
+        end
+      end
       
-      @md5 = Digest::MD5.file(@path).hexdigest if $options[:md5]
       @osx_tags = osx_tag_ids(path) if /darwin/.match(RUBY_PLATFORM) # == osx
       @fshugo_tags = fshugo_tag_ids(path)
     else
       @mimetype = nil
       @magicdescr = nil
+      @osx_tags = []
+      @fshugo_tags = []
     end
   end
   
@@ -141,14 +165,15 @@ class FileDefinition
     h = {
       "type" => "file",
       "path" => p,
-      "bytes" => bytes, 
-      'ctime' => ctime, 
-      'mtime' => mtime
+      "bytes" => @bytes, 
+      'ctime' => @ctime, 
+      'mtime' => @mtime
     }
-    h["mimetype"] = mimetype unless mimetype.nil?
-    h["magicdescr"] = magicdescr unless magicdescr.nil?
-    h["md5"] = @md5 unless md5.nil?
-    h["osx_tags"] = @osx_tags unless osx_tags.empty?
+    h["mimetype"] = @mimetype unless @mimetype.nil?
+    h["magicdescr"] = @magicdescr unless @magicdescr.nil?
+    h["crc32"] = @crc32 unless @crc32.nil?
+    h["md5"] = @md5 unless @md5.nil?
+    h["osx_tags"] = @osx_tags unless @osx_tags.empty?
     h["fshugo_tags"] = @fshugo_tags unless @fshugo_tags.empty?
     return h
   end
@@ -172,10 +197,12 @@ class FileDefinition
     self.bytes = data['bytes']
     self.ctime = data['ctime']
     self.mtime = data['mtime']
-    self.osx_tags = data['osx_tags'] if data['osx_tags'].exists?
-    self.fshugo_tags = data['fshugo_tags'] if data['fshugo_tags'].exists?
     self.mimetype = data['mimetype']
     self.magicdescr = data['magicdescr']
+    self.crc32 = data["crc32"] if data['crc32'].exists?
+    self.md5 = data["md5"] if data['md5'].exists?
+    self.osx_tags = data['osx_tags'] if data['osx_tags'].exists?
+    self.fshugo_tags = data['fshugo_tags'] if data['fshugo_tags'].exists?
   end
 end # FileDefinition
 
@@ -183,17 +210,17 @@ class DirectoryDefinition
   
   attr_accessor :path,:bytes,:ctime,:mtime,:file_count,:item_count,:osx_tags,:fshugo_tags,:file_list
   
-  def initialize(path, pseudofile)
+  def initialize(path, reduced_scan = false)
     @path = path
     @bytes = 0
     @file_list = []
     @file_count = 0 
     @item_count = 0
-    @osx_tags = osx_tag_ids(path) if /darwin/.match(RUBY_PLATFORM) # == osx
-    @fshugo_tags = fshugo_tag_ids(path)
-    unless pseudofile
+    unless reduced_scan # don't do this if we only want to know file sizes (for pseudofiles, .git folders, etc)
       @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" if $options[:verbose]; "unavailable" )
       @mtime = File.mtime(path) rescue (puts "error getting modification time for directory #{path}" if $options[:verbose]; "unavailable" )
+      @osx_tags = osx_tag_ids(path) if /darwin/.match(RUBY_PLATFORM) # == osx
+      @fshugo_tags = fshugo_tag_ids(path)
     end
   end
   
@@ -203,14 +230,14 @@ class DirectoryDefinition
       "type" => "directory", 
       "path" => p, 
       "bytes" => bytes, 
-      'ctime' => ctime, 
-      'mtime' => mtime, 
-      "file_count" => file_count, 
-      "item_count" => item_count
+      'ctime' => @ctime, 
+      'mtime' => @mtime, 
+      "file_count" => @file_count, 
+      "item_count" => @item_count
     }
     h["osx_tags"] = @osx_tags unless @osx_tags.empty?
     h["fshugo_tags"] = @fshugo_tags unless @fshugo_tags.empty?
-    h["file_list"] = file_list
+    h["file_list"] = @file_list
     return h
   end
   
@@ -269,12 +296,12 @@ class FsInventory
   
   def to_hash
     return {
-      "timestamp" => timestamp,
-      "file_structure" => file_structure,
-      "mime_tab" => mime_tab,
-      "magic_tab" => magic_tab,
-      "osx_tab" => osx_tab,
-      "fshugo_tab" => fshugo_tab
+      "timestamp" => @timestamp,
+      "file_structure" => @file_structure,
+      "mime_tab" => @mime_tab,
+      "magic_tab" => @magic_tab,
+      "osx_tab" => @osx_tab,
+      "fshugo_tab" => @fshugo_tab
     }
   end
   
@@ -291,12 +318,12 @@ class FsInventory
   end
 
   def marshal_load(data)
-    self.file_structure = data['file_structure']
-    self.timestamp = data['timestamp']
-    self.magic_tab = data['magic_tab']
-    self.mime_tab = data['mime_tab']
-    self.osx_tab = data['osx_tab']
-    self.fshugo_tab = data['fshugo_tab']
+    self.file_structure = data['file_structure'] if data['file_structure'].exists?
+    self.timestamp = data['timestamp'] if data['timestamp'].exists?
+    self.magic_tab = data['magic_tab'] if data['magic_tab'].exists?
+    self.mime_tab = data['mime_tab'] if data['mime_tab'].exists?
+    self.osx_tab = data['osx_tab'] if data['osx_tab'].exists?
+    self.fshugo_tab = data['fshugo_tab'] if data['fshugo_tab'].exists?
   end
 end
 
@@ -352,23 +379,23 @@ def fshugo_tag_ids(file_path)
 end
 
 #returns DirectoryDefinition object
-def parse(folder_path, pseudofile = false)
+def parse(folder_path, reduced_scan = false)
   
   if $IGNORE_FILES.include?(File.basename(folder_path))
     # do nothing
   elsif File.basename(folder_path)[0..1] == "._"
     # these are some osx files no one cares about -> ignore
   elsif $PSEUDO_FILES.include?(File.extname(folder_path)) # stuff like .app, .bundle, .mbox etc.
-    puts "processing pseudofile #{folder_path}" unless pseudofile || $options[:silent]
-    pseudofile = true
+    puts "processing reduced_scan #{folder_path}" unless reduced_scan || $options[:silent]
+    reduced_scan = true
   elsif File.basename(folder_path)[0] == "."
-    puts "processing dotfile #{folder_path}" unless pseudofile || $options[:silent]
-    pseudofile = true
+    puts "processing dotfile #{folder_path}" unless reduced_scan || $options[:silent]
+    reduced_scan = true
   else
-    puts "processing #{folder_path}/*" unless pseudofile || $options[:silent]
+    puts "processing #{folder_path}/*" unless reduced_scan || $options[:silent]
   end
   
-  curr_dir = DirectoryDefinition.new(folder_path, pseudofile)
+  curr_dir = DirectoryDefinition.new(folder_path, reduced_scan)
   
   begin
     Pathname.new(folder_path).children.each { |f| 
@@ -376,17 +403,17 @@ def parse(folder_path, pseudofile = false)
       if $IGNORE_FILES.include?(File.basename(file))
         # do nothing
       elsif File.directory?(file) 
-        sub_folder = parse(file, pseudofile)
+        sub_folder = parse(file, reduced_scan)
         curr_dir.bytes += sub_folder.bytes
-        curr_dir.file_list << sub_folder unless pseudofile
+        curr_dir.file_list << sub_folder unless reduced_scan
         curr_dir.item_count += 1 # count this directory as an item
-        curr_dir.item_count += sub_folder.item_count unless pseudofile
+        curr_dir.item_count += sub_folder.item_count unless reduced_scan
       else
-        puts "processing #{file}" if $options[:verbose] && !pseudofile && $options[:silent].nil?
-        sub_file = FileDefinition.new(file, !pseudofile)
+        puts "processing #{file}" if $options[:verbose] && !reduced_scan && $options[:silent].nil?
+        sub_file = FileDefinition.new(file, reduced_scan)
         curr_dir.bytes += sub_file.bytes
-        curr_dir.file_list << sub_file unless pseudofile
-        curr_dir.item_count += 1 unless pseudofile
+        curr_dir.file_list << sub_file unless reduced_scan
+        curr_dir.item_count += 1 unless reduced_scan
       end
     }
   rescue
@@ -527,6 +554,11 @@ if __FILE__ == $0
     end
     opts.separator ""
     
+    opts.on("-c", "--crc32", "Calculate CRC32 checksum for each file") do |crc|
+      $options[:crc32] = true
+    end
+    opts.separator ""
+    
     opts.on("-d", "--db [FILE]", "Save inventory as SQLite database. 
                                      Default destination is #{DEFAULT_NAME}.db") do |sql_file|
       $options[:db] = true
@@ -614,6 +646,27 @@ if __FILE__ == $0
   $mime_tab   = LookupTable.new
   $osx_tab    = LookupTable.new
   $fshugo_tab = LookupTable.new
+  
+  if $options[:crc32]
+    begin
+      require 'digest/crc32'
+    rescue
+      puts "You have selected crc32 calculation option. This requires digest/crc32."
+      puts "Install using 'gem install digest-crc'"
+      exit
+    end
+  end
+  
+  if $options[:md5] 
+    begin
+      require 'digest/md5'
+    rescue
+      puts "You have selected md5 calculation option. This requires digest/md5."
+      puts "Install using 'gem install digest'"
+      exit
+    end
+  end
+  
 
   file_structure = []
   ARGV.each do |basepath|
