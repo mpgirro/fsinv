@@ -50,19 +50,28 @@ module Fsinv
 
   # calculate the sizes of these folders, yet do not write their content into the
   # inventory index. these appear as files on osx (.app, .bundle)
-  PSEUDO_FILES = ['.app','.bundle','.mbox','.plugin','.sparsebundle']
+  PSEUDO_FILES = [
+    '.app',
+    '.bundle',
+    '.mbox', # osx mailbox exports
+    '.plugin',
+    '.sparsebundle',
+    '.abbu', # osx contact archive exports
+    '.mode'  # SubEthaEdit and Coda modes
+  ]
   
   class << self
     attr_accessor :options, :fmagic, :mime_tab, :magic_tab, :osx_tab, :fshugo_tab
   end
   
-  @@options = {}
+  @@options    = {}
   @@fmagic     = FileMagic.new 
-  @@magic_tab  = Fsinv::LookupTable.new # magic file descriptions
+  @@magic_tab  = Fsinv::LookupTable.new
   @@mime_tab   = Fsinv::LookupTable.new
   @@osx_tab    = Fsinv::LookupTable.new
   @@fshugo_tab = Fsinv::LookupTable.new
   
+  # tries to handle various encoding problems encounterd with path strings
   def sanitize_string(string)
     return string.encode("UTF-16BE", :invalid=>:replace, :undef => :replace, :replace=>"?")
                  .encode("UTF-8")
@@ -107,7 +116,7 @@ module Fsinv
   
     curr_dir = Fsinv::DirectoryDescription.new(folder_path, reduced_scan)
   
-    begin
+    #begin
       Pathname.new(folder_path).children.each { |f| 
         file = f.to_s.encode("UTF-8")
         if IGNORE_FILES.include?(File.basename(file))
@@ -126,9 +135,9 @@ module Fsinv
           curr_dir.item_count += 1 unless reduced_scan
         end
       }
-    rescue
-      puts "permission denied: #{curr_dir}" unless @options[:silent]
-    end
+      #rescue
+      #puts "permission denied: #{folder_path}" unless @options[:silent]
+      #end
 
     return curr_dir
   end # parse
