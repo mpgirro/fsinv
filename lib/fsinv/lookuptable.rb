@@ -6,26 +6,30 @@ module Fsinv
   
     def initialize
       @val_map = Hash.new
-      @idcursor = 1
+      @idcursor = 0
     end  
   
-    def contains?(descr)
-      return descr == "" ? false : @val_map.has_value?(descr)
+    def contains?(value)
+      return value == "" ? false : @val_map.has_value?(value)
     end
   
-    def add(descr)
-      unless descr == ""
-        @val_map[idcursor] = descr
+    def add(value)
+      unless self.contains?(value)
         @idcursor += 1
+        @val_map[@idcursor] = value
+        return @idcursor
+      else
+        return get_id(value)
       end
+      
     end
     
     def empty?
       return @val_map.empty?
     end
   
-    def get_id(descr)
-      return descr == "" ? 0 : @val_map.key(descr)
+    def get_id(value)
+      return descr == "" ? 0 : @val_map.key(value)
     end
   
     def get_value(id)
