@@ -2,7 +2,11 @@
 
 imagine a very detailed README message here (please?)
 
-## Usage
+## Installation
+
+Just run ```gem install fsinv```
+
+## Usage of the executable
 
 	Usage: fsinv.rb basepath1 [basepath2 [basepath3 [...]]] [options]
 
@@ -63,3 +67,7 @@ imagine a very detailed README message here (please?)
 	                                     Default destination is inventory.yaml
 
 	    -h, --help                       Show this message
+		
+## Usage as a library
+
+Note: You must set ```Fsinv.options``` before using any Methods/Classes. 
