@@ -1,8 +1,7 @@
-require 'fsinv/basedefinition'
 
 module Fsinv
 
-  class FileDefinition < BaseDefinition
+  class FileDescription < Fsinv::BaseDescription
     
     include Fsinv
   
@@ -52,20 +51,12 @@ module Fsinv
     end # initialize
   
     def to_hash
-      p = sanitize_string(@path) rescue "path encoding broken" # there can be ArgumentError and UndefinedConversionError
-      h = {
-        "type" => "file",
-        "path" => p,
-        "bytes" => @bytes, 
-        'ctime' => @ctime, 
-        'mtime' => @mtime
-      }
+      h = super.to_hash
+      h["type"] = "file"
       h["mimetype"] = @mimetype unless @mimetype.nil?
       h["magicdescr"] = @magicdescr unless @magicdescr.nil?
       h["crc32"] = @crc32 unless @crc32.nil?
       h["md5"] = @md5 unless @md5.nil?
-      h["osx_tags"] = @osx_tags unless @osx_tags.empty?
-      h["fshugo_tags"] = @fshugo_tags unless @fshugo_tags.empty?
       return h
     end # to_hash
   

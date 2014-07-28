@@ -1,7 +1,7 @@
 
 module Fsinv
 
-  class BaseDefinition
+  class BaseDescription
     
     include Fsinv
     
@@ -43,6 +43,27 @@ module Fsinv
         @fshugo_tags = []
       end
     end # initialize
+    
+    def to_hash
+      p = sanitize_string(@path) rescue "path encoding broken" # there can be ArgumentError and UndefinedConversionError
+      h = {
+        "path" => p,
+        "bytes" => @bytes, 
+        'ctime' => @ctime, 
+        'mtime' => @mtime
+      }
+      h["osx_tags"] = @osx_tags unless @osx_tags.empty?
+      h["fshugo_tags"] = @fshugo_tags unless @fshugo_tags.empty?
+      return h
+    end # to_hash
+  
+    def as_json(options = { })
+      return to_hash
+    end
+    
+    def to_json(*a)
+      return as_json.to_json(*a )
+    end
     
   end # FileDefinition
   

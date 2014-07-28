@@ -13,9 +13,9 @@ end
 require 'pathname'
 require 'ffi-xattr'
 
-require 'fsinv/basedefinition'
-require 'fsinv/directorydefinition'
-require 'fsinv/filedefinition'
+require 'fsinv/basedescription'
+require 'fsinv/directorydescription'
+require 'fsinv/filedescription'
 require 'fsinv/fsinventory'
 require 'fsinv/lookuptable'
 
@@ -122,7 +122,7 @@ module Fsinv
       puts "processing #{folder_path}/*" unless reduced_scan || @options[:silent]
     end
   
-    curr_dir = Fsinv::DirectoryDefinition.new(folder_path, reduced_scan)
+    curr_dir = Fsinv::DirectoryDescription.new(folder_path, reduced_scan)
   
     #begin
       Pathname.new(folder_path).children.each { |f| 
@@ -137,7 +137,7 @@ module Fsinv
           curr_dir.item_count += sub_folder.item_count unless reduced_scan
         else
           puts "processing #{file}" if @options[:verbose] && !reduced_scan && @options[:silent].nil?
-          sub_file = Fsinv::FileDefinition.new(file, reduced_scan)
+          sub_file = Fsinv::FileDescription.new(file, reduced_scan)
           curr_dir.bytes += sub_file.bytes
           curr_dir.file_list << sub_file unless reduced_scan
           curr_dir.item_count += 1 unless reduced_scan
