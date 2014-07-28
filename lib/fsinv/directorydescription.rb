@@ -1,4 +1,6 @@
 
+require 'fsinv'
+
 module Fsinv
 
   class DirectoryDescription < Fsinv::BaseDescription

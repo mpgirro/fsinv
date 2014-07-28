@@ -1,4 +1,6 @@
 
+require 'fsinv'
+
 module Fsinv
 
   class FileDescription < Fsinv::BaseDescription
@@ -41,10 +43,10 @@ module Fsinv
 
         if @@options[:md5]
           begin
-            @crc32 = Digest::MD5.file(@path).hexdigest
+            @md5 = Digest::MD5.file(@path).hexdigest
           rescue
             puts "error calculating md5 for #{path}" if @@options[:verbose]
-            @crc32 = "error during calculation"
+            @md5 = "error during calculation"
           end
         end
       end

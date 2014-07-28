@@ -1,3 +1,6 @@
+
+require 'fsinv'
+
 module Fsinv
 
   class Inventory
