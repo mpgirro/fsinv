@@ -179,14 +179,14 @@ if __FILE__ == $0
     file_structure.each do |fs_tree|
       size = fs_tree.bytes
       puts "basepath: #{fs_tree.path}"
-      puts "    size:  #{Fsinv.pretty_bytes_string(size)} (#{size} Bytes)"
+      puts "    size:  #{Fsinv.pretty_SI_bytes(size)} (#{size} Bytes)"
       puts "    files: #{fs_tree.file_list.length}"
       puts "    items: #{fs_tree.item_count}"
     end
     if file_structure.length > 1
       size = inventory.size
       puts "total:"
-      puts "    size:  #{Fsinv.pretty_bytes_string(size)} (#{size} Bytes)"
+      puts "    size:  #{Fsinv.pretty_SI_bytes(size)} (#{size} Bytes)"
       puts "    items: #{inventory.item_count}"
     end
   end

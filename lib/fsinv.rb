@@ -2,16 +2,7 @@
 
 # author: Maximilian Irro <max@disposia.org>, 2014
 
-require 'mime/types'
-begin
-  require 'filemagic'
-rescue
-  puts "gem 'filemagic' required. Install using 'gem install ruby-filemagic'"
-  puts "If you have trouble on OSX you may need to run 'brew install libmagic' before"
-  exit
-end
 require 'pathname'
-require 'ffi-xattr'
 
 require 'fsinv/basedescription'
 require 'fsinv/directorydescription'
@@ -19,17 +10,37 @@ require 'fsinv/filedescription'
 require 'fsinv/inventory'
 require 'fsinv/lookuptable'
 
+begin
+  require 'mime/types'
+rescue LoadError
+  puts "gem 'mime' required. Install it using 'gem install mime-types'"
+  exit
+end
+
+begin
+  require 'filemagic'
+rescue LoadError
+  puts "gem 'filemagic' required. Install it using 'gem install ruby-filemagic'"
+  puts "If you have trouble on OSX you may need to run 'brew install libmagic' before"
+  exit
+end
+
+begin
+  require 'ffi-xattr'
+rescue LoadError
+  puts "gem 'ffi-xattr' required. Install it using 'gem install ffi-xattr'"
+  exit
+end
 
 module Fsinv
   
-  # Kibibyte, Mebibyte, Gibibyte, etc... 
-  # use these if you find a KB to be 2^10 bits
-  #BYTES_IN_KiB = 2**10
-  #BYTES_IN_MiB = 2**20
-  #BYTES_IN_GiB = 2**30
-  #BYTES_IN_TiB = 2**40
+  # Kibibyte, Mebibyte, Gibibyte, etc... all the IEC sizes
+  BYTES_IN_KiB = 2**10
+  BYTES_IN_MiB = 2**20
+  BYTES_IN_GiB = 2**30
+  BYTES_IN_TiB = 2**40
 
-  # these define a KB as 1000 bits
+  # these define a KB as 1000 bits, according to the SI prefix 
   BYTES_IN_KB = 10**3
   BYTES_IN_MB = 10**6
   BYTES_IN_GB = 10**9
@@ -61,50 +72,22 @@ module Fsinv
   
   module_function # all following methods will be callable from outside the module
   
-  def pretty_bytes_string(bytes)
+  def pretty_SI_bytes(bytes)
     return "%.1f TB" % (bytes.to_f / BYTES_IN_TB) if bytes > BYTES_IN_TB
     return "%.1f GB" % (bytes.to_f / BYTES_IN_GB) if bytes > BYTES_IN_GB
     return "%.1f MB" % (bytes.to_f / BYTES_IN_MB) if bytes > BYTES_IN_MB
     return "%.1f KB" % (bytes.to_f / BYTES_IN_KB) if bytes > BYTES_IN_KB
     return "#{bytes} B"
   end
-
-  def osx_tag_ids(file_path)
-    # array with the kMDItemUserTags strings 
-    # of the extended file attributes of 'path'
-    tags = %x{mdls -name 'kMDItemUserTags' -raw "#{file_path}"|tr -d "()\n"}.split(',').map { |tag| 
-      tag.strip.gsub(/"(.*?)"/,"\\1")
-    }
-    # if there are now tags, mdls returns "null" -> we don't want this
-    if tags.length == 1 && tags[0] == "null"
-      return []
-    else
-      tag_ids = []
-      tags.each do |tag|
-        @@osx_tab.add(tag) unless @@osx_tab.contains?(tag)
-        tag_ids << @@osx_tab.get_id(tag)
-      end
-      return tag_ids
-    end
-  end # osx_tag_ids
-
-
-  def fshugo_tag_ids(file_path)
-    xattr = Xattr.new(file_path)
-    unless xattr["fshugo"].nil?
-      tags = xattr["fshugo"].split(";") 
-      tag_ids = []
-      tags.each do |tag|
-        @@fshugo_tab.add(tag) unless @@fshugo_tab.contains?(tag)
-        tag_ids << @@fshugo_tab.get_id(tag)
-      end
-      return tag_ids
-      #return tags
-    else
-      return []
-    end 
-  end # fshugo_tag_ids
   
+  def pretty_IEC_bytes(bytes)
+    return "%.1f TB" % (bytes.to_f / BYTES_IN_TiB) if bytes > BYTES_IN_TiB
+    return "%.1f GB" % (bytes.to_f / BYTES_IN_GiB) if bytes > BYTES_IN_GiB
+    return "%.1f MB" % (bytes.to_f / BYTES_IN_MiB) if bytes > BYTES_IN_MiB
+    return "%.1f KB" % (bytes.to_f / BYTES_IN_KiB) if bytes > BYTES_IN_KiB
+    return "#{bytes} B"
+  end
+
   #returns DirectoryDefinition object
   def parse(folder_path, reduced_scan = false)
   
