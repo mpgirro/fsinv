@@ -32,14 +32,15 @@ module Fsinv
     end
   
     def to_hash
-      return {
+      h = {
         "timestamp" => @timestamp,
         "file_structure" => @file_structure,
-        "mime_tab" => @mime_tab,
-        "magic_tab" => @magic_tab,
-        "osx_tab" => @osx_tab,
-        "fshugo_tab" => @fshugo_tab
       }
+      h["mime_tab"] = @mime_tab unless @mime_tab.empty?
+      h["magic_tab"] = @magic_tab unless @magic_tab.empty?
+      h["osx_tab"] = @osx_tab unless @osx_tab.empty?
+      h["fshugo_tab"] = @fshugo_tab unless @fshugo_tab.empty?
+      return h
     end
   
     def as_json(options = { })

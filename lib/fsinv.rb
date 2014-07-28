@@ -16,7 +16,7 @@ require 'ffi-xattr'
 require 'fsinv/basedescription'
 require 'fsinv/directorydescription'
 require 'fsinv/filedescription'
-require 'fsinv/fsinventory'
+require 'fsinv/inventory'
 require 'fsinv/lookuptable'
 
 

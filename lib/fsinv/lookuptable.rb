@@ -19,6 +19,10 @@ module Fsinv
         @idcursor += 1
       end
     end
+    
+    def empty?
+      return @val_map.empty?
+    end
   
     def get_id(descr)
       return descr == "" ? 0 : @val_map.key(descr)
