@@ -251,17 +251,31 @@ module Fsinv
           } 
           #output the magic tab
           xml.magic_tab{
-            inventory.magic_tab.val_map.each{ |id, descr|
+            inventory.magic_tab.val_map.each{ |id, val|
               xml.item{
                 xml.id(id)
-                xml.description(descr)
+                xml.value(val)
           } } }
           #ouput the mime tab
           xml.mime_tab{
-            inventory.mime_tab.val_map.each{ |id, descr|
+            inventory.mime_tab.val_map.each{ |id, val|
               xml.item{
                 xml.id(id)
-                xml.description(descr)
+                xml.value(val)
+          } } }
+          
+          xml.osx_tab{
+            inventory.osx_tab.val_map.each{ |id, val|
+              xml.item{
+                xml.id(id)
+                xml.value(val)
+          } } }
+          
+          xml.fshugo_tab{
+            inventory.fshugo_tab.val_map.each{ |id, val|
+              xml.item{
+                xml.id(id)
+                xml.value(val)
           } } }
         }
       end
