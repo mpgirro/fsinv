@@ -144,11 +144,11 @@ module Fsinv
     }
   
     case structitem
-    when DirectoryDefinition
+    when DirectoryDescription
       h[:entity_type] = "directory"
       h[:file_count] = structitem.file_count
       h[:item_count] = structitem.item_count
-    when FileDefinition
+    when FileDescription
       h[:entity_type] = "file"
       mime_descr = @@mime_tab.get_value(structitem.mimetype)
       mime_id = MimeType.where(:mimetype => mime_descr).ids.first
@@ -199,7 +199,7 @@ module Fsinv
 
   def filestructure_to_xml(xml, defobj)
     case defobj
-    when DirectoryDefinition
+    when DirectoryDescription
       xml.directory{
         xml.path(defobj.path)
         xml.bytes(defobj.bytes)
@@ -211,7 +211,7 @@ module Fsinv
           end
         }
       }
-    when FileDefinition
+    when FileDescription
       xml.file{
         xml.path(defobj.path)
         xml.bytes(defobj.bytes)

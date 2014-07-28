@@ -53,7 +53,7 @@ if __FILE__ == $0
     opts.separator ""
     
     opts.on("-b", "--binary [FILE]", "Dump iventory data stuctures in binary format. 
-                                     Default destination is #{DEFAULT_NAME}.bin") do |binary_file|
+                                     Default destination is ~/#{DEFAULT_NAME}.bin") do |binary_file|
       Fsinv.options[:binary] = true
       Fsinv.options[:binary_file] = binary_file
     end
@@ -65,7 +65,7 @@ if __FILE__ == $0
     opts.separator ""
     
     opts.on("-d", "--db [FILE]", "Save inventory as SQLite database. 
-                                     Default destination is #{DEFAULT_NAME}.db") do |sql_file|
+                                     Default destination is ~/#{DEFAULT_NAME}.db") do |sql_file|
       Fsinv.options[:db] = true
       Fsinv.options[:db_file] = sql_file 
     end
@@ -77,7 +77,7 @@ if __FILE__ == $0
     end
   
     opts.on("-j", "--json [FILE]", "Save inventory in JSON file format. 
-                                     Default destination is #{DEFAULT_NAME}.json") do |json_file|
+                                     Default destination is ~/#{DEFAULT_NAME}.json") do |json_file|
       Fsinv.options[:json] = true
       Fsinv.options[:json_file] = json_file
     end
@@ -114,14 +114,14 @@ if __FILE__ == $0
     opts.separator ""
   
     opts.on("-x", "--xml [FILE]", "Save inventory in XML file format. 
-                                     Default destination is #{DEFAULT_NAME}.xml") do |xml_file|
+                                     Default destination is ~/#{DEFAULT_NAME}.xml") do |xml_file|
       Fsinv.options[:xml] = true
       Fsinv.options[:xml_file] = xml_file 
     end
     opts.separator ""
   
     opts.on("-y", "--yaml [FILE]", "Save inventory in YAML file format. 
-                                     Default destination is #{DEFAULT_NAME}.yaml") do |yaml_file|
+                                     Default destination is ~/#{DEFAULT_NAME}.yaml") do |yaml_file|
       Fsinv.options[:yaml] = true
       Fsinv.options[:yaml_file] = yaml_file
     end
@@ -194,12 +194,13 @@ if __FILE__ == $0
   # this is the default output
   unless (Fsinv.options[:binary]||Fsinv.options[:db]||Fsinv.options[:xml]||Fsinv.options[:yaml]) && Fsinv.options[:json].nil?
     if Fsinv.options[:json_file].nil?
-      Fsinv.options[:json_file] = 
+      Fsinv.options[:json_file] = File.join(Dir.home,
         if Fsinv.options[:name].nil?
           "#{DEFAULT_NAME}.json"
         else 
           "#{Fsinv.options[:name]}.json"
         end
+      )
     end
     puts "writing JSON to #{Fsinv.options[:json_file]}" unless Fsinv.options[:silent]
     
@@ -234,12 +235,13 @@ if __FILE__ == $0
 
   if Fsinv.options[:yaml]
     if Fsinv.options[:yaml_file].nil?
-      Fsinv.options[:yaml_file] = 
+      Fsinv.options[:yaml_file] = File.join(Dir.home,
         if Fsinv.options[:name].nil?
           "#{DEFAULT_NAME}.yaml"
         else
           "#{Fsinv.options[:name]}.yaml"
         end
+      )
     end
     puts "writing YAML to #{Fsinv.options[:yaml_file]}" unless Fsinv.options[:silent]
     yaml_data = Fsinv.inventory_to_yaml(inventory)
@@ -257,12 +259,13 @@ if __FILE__ == $0
   
   if Fsinv.options[:binary]
     if Fsinv.options[:binary_file].nil?
-      Fsinv.options[:binary_file] = 
+      Fsinv.options[:binary_file] = File.join(Dir.home,
         if Fsinv.options[:name].nil?
           "#{DEFAULT_NAME}.bin"
         else
           "#{Fsinv.options[:name]}.bin"
         end
+      )
     end
     puts "writing binary dump to #{Fsinv.options[:binary_file]}" unless Fsinv.options[:silent]
     begin
@@ -277,16 +280,17 @@ if __FILE__ == $0
   
   if Fsinv.options[:db]
     if Fsinv.options[:db_file].nil?
-      Fsinv.options[:db_file] = 
+      Fsinv.options[:db_file] = File.join(Dir.home,
         if Fsinv.options[:name].nil?
           "#{DEFAULT_NAME}.db"
         else
           "#{Fsinv.options[:name]}.db"
         end
+      )
     end
 
     puts "writing database dump to #{Fsinv.options[:db_file]}" unless Fsinv.options[:silent]
-    `rm #{Fsinv.options[:db_file]}`
+    `rm #{Fsinv.options[:db_file]}` if File.exists?(Fsinv.options[:db_file])
 
     begin
       
@@ -374,12 +378,13 @@ if __FILE__ == $0
 
   if Fsinv.options[:xml]
     if Fsinv.options[:xml_file].nil?
-      Fsinv.options[:xml_file] = 
+      Fsinv.options[:xml_file] = File.join(Dir.home,
         if Fsinv.options[:name].nil?
           "#{DEFAULT_NAME}.xml"
         else
           "#{Fsinv.options[:name]}.xml"
         end
+      )
     end
     puts "writing XML to #{Fsinv.options[:xml_file]}" unless Fsinv.options[:silent]
     xml_data = Fsinv.inventory_to_xml(inventory)
