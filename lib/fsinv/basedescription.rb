@@ -65,6 +65,42 @@ module Fsinv
       return as_json.to_json(*a )
     end
     
+    def osx_tag_ids(file_path)
+      # array with the kMDItemUserTags strings 
+      # of the extended file attributes of 'path'
+      tags = %x{mdls -name 'kMDItemUserTags' -raw "#{file_path}"|tr -d "()\n"}.split(',').map { |tag| 
+        tag.strip.gsub(/"(.*?)"/,"\\1")
+      }
+      # if there are now tags, mdls returns "null" -> we don't want this
+      if tags.length == 1 && tags[0] == "null"
+        return []
+      else
+        tag_ids = []
+        tags.each do |tag|
+          @@osx_tab.add(tag) unless @@osx_tab.contains?(tag)
+          tag_ids << @@osx_tab.get_id(tag)
+        end
+        return tag_ids
+      end
+    end # osx_tag_ids
+
+
+    def fshugo_tag_ids(file_path)
+      xattr = Xattr.new(file_path)
+      unless xattr["fshugo"].nil?
+        tags = xattr["fshugo"].split(";") 
+        tag_ids = []
+        tags.each do |tag|
+          @@fshugo_tab.add(tag) unless @@fshugo_tab.contains?(tag)
+          tag_ids << @@fshugo_tab.get_id(tag)
+        end
+        return tag_ids
+        #return tags
+      else
+        return []
+      end 
+    end # fshugo_tag_ids
+    
   end # FileDefinition
   
 end # Fsinv
