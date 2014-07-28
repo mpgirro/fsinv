@@ -13,10 +13,12 @@ end
 require 'pathname'
 require 'ffi-xattr'
 
+require 'fsinv/basedefinition'
 require 'fsinv/directorydefinition'
 require 'fsinv/filedefinition'
 require 'fsinv/fsinventory'
 require 'fsinv/lookuptable'
+
 
 module Fsinv
   
@@ -122,7 +124,7 @@ module Fsinv
   
     curr_dir = Fsinv::DirectoryDefinition.new(folder_path, reduced_scan)
   
-    begin
+    #begin
       Pathname.new(folder_path).children.each { |f| 
         file = f.to_s.encode("UTF-8")
         if IGNORE_FILES.include?(File.basename(file))
@@ -141,9 +143,9 @@ module Fsinv
           curr_dir.item_count += 1 unless reduced_scan
         end
       }
-    rescue
-      puts "permission denied: #{curr_dir}" unless @options[:silent]
-    end
+      #rescue
+      #puts "permission denied: #{curr_dir}" unless @options[:silent]
+      #end
 
     return curr_dir
   end # parse

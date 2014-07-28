@@ -1,73 +1,53 @@
+require 'fsinv/basedefinition'
+
 module Fsinv
 
-  class FileDefinition
+  class FileDefinition < BaseDefinition
     
     include Fsinv
   
-    attr_accessor :path,:bytes,:ctime,:mtime,:mimetype,:magicdescr,:crc32,:md5,:osx_tags,:fshugo_tags
+    attr_accessor :mimetype,:magicdescr,:crc32,:md5
   
     def initialize(path, reduced_scan = false)
-      @path = path
-      @bytes = File.size(@path) rescue (puts "error: exception getting size for file #{path}" if @options[:verbose]; 0)
-    
-      unless reduced_scan # don't do this if we only want to know file sizes (for pseudofiles, .git folders, etc)
-      
-        begin 
-          @ctime = File.ctime(path) 
-        rescue
-          puts "error getting creation time for file #{path}" if @options[:verbose]
-          @ctime = "unavailable"
-        end
-      
-        begin 
-          @mtime = File.ctime(path) 
-        rescue
-          puts "error getting modification time for file #{path}" if @options[:verbose]
-          @mtime = "unavailable"
-        end
 
+      super(path,reduced_scan)
+
+      unless reduced_scan # don't do this if we only want to know file sizes (for pseudofiles, .git folders, etc)
         begin
           type_str = MIME::Types.type_for(@path).join(', ')
-          @mime_tab.add(type_str) unless @mime_tab.contains?(type_str)
-          @mimetype = @mime_tab.get_id(type_str)
+          @@mime_tab.add(type_str) unless @@mime_tab.contains?(type_str)
+          @mimetype = @@mime_tab.get_id(type_str)
         rescue ArgumentError # if this happens you should definitly repair some file names
+          puts "error: mime type unavailable" unless @@options[:silent]
           @mimetype = nil
         end
     
         begin 
-          description = sanitize_string(@fmagic.file(@path))
-          @magic_tab.add(description) unless @magic_tab.contains?(description)
-          @magicdescr = @magic_tab.get_id(description)
+          description = sanitize_string(@@fmagic.file(@path))
+          @@magic_tab.add(description) unless @@magic_tab.contains?(description)
+          @magicdescr = @@magic_tab.get_id(description)
         rescue
-          puts "error: file kind information unavailable" unless @options[:silent]
+          puts "error: file magic file information unavailable" unless @@options[:silent]
           @magicdescr = nil
         end
       
-        if @options[:crc32]
+        if @@options[:crc32]
           begin
             @crc32 = Digest::CRC32.file(@path).hexdigest
           rescue
-            puts "error calculating crc32 for #{path}" if @options[:verbose]
+            puts "error calculating crc32 for #{path}" if @@options[:verbose]
             @crc32 = "error during calculation"
           end
         end
 
-        if @options[:md5]
+        if @@options[:md5]
           begin
             @crc32 = Digest::MD5.file(@path).hexdigest
           rescue
-            puts "error calculating md5 for #{path}" if @options[:verbose]
+            puts "error calculating md5 for #{path}" if @@options[:verbose]
             @crc32 = "error during calculation"
           end
         end
-      
-        @osx_tags = osx_tag_ids(path) if /darwin/.match(RUBY_PLATFORM) # == osx
-        @fshugo_tags = fshugo_tag_ids(path)
-      else
-        @mimetype = nil
-        @magicdescr = nil
-        @osx_tags = []
-        @fshugo_tags = []
       end
     end # initialize
   

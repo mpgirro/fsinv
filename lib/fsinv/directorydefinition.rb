@@ -13,8 +13,8 @@ module Fsinv
       @file_count = 0 
       @item_count = 0
       unless reduced_scan # don't do this if we only want to know file sizes (for pseudofiles, .git folders, etc)
-        @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" if @options[:verbose]; "unavailable" )
-        @mtime = File.mtime(path) rescue (puts "error getting modification time for directory #{path}" if @options[:verbose]; "unavailable" )
+        @ctime = File.ctime(path) rescue (puts "error getting creation time for directory #{path}" if @@options[:verbose]; "unavailable" )
+        @mtime = File.mtime(path) rescue (puts "error getting modification time for directory #{path}" if @@options[:verbose]; "unavailable" )
         @osx_tags = osx_tag_ids(path) if /darwin/.match(RUBY_PLATFORM) # == osx
         @fshugo_tags = fshugo_tag_ids(path)
       end
@@ -31,8 +31,8 @@ module Fsinv
         "file_count" => @file_count, 
         "item_count" => @item_count
       }
-      h["osx_tags"] = @osx_tags #unless @osx_tags.empty?
-      h["fshugo_tags"] = @fshugo_tags #unless @fshugo_tags.empty?
+      h["osx_tags"] = @osx_tags unless @osx_tags.empty?
+      h["fshugo_tags"] = @fshugo_tags unless @fshugo_tags.empty?
       h["file_list"] = @file_list
       return h
     end
