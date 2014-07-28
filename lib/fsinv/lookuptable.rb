@@ -16,14 +16,12 @@ module Fsinv
     def add(value)
       if self.contains?(value)
         return get_id(value)
+      elsif value == ""
+        return nil
       else
-        unless value == ""
-          @idcursor += 1
-          @val_map[@idcursor] = value
-          return @idcursor
-        else 
-          return 0
-        end
+        @idcursor += 1
+        @val_map[@idcursor] = value
+        return @idcursor
       end
       
     end
@@ -33,11 +31,11 @@ module Fsinv
     end
   
     def get_id(value)
-      return value == "" ? 0 : @val_map.key(value)
+      return self.contains?(value) ? @val_map.key(value) : nil
     end
   
     def get_value(id)
-      return @val_map[id]
+      return self.contains?(value) ? @val_map[id] : nil
     end
   
     def to_a
