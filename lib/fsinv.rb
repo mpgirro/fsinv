@@ -81,10 +81,10 @@ module Fsinv
   end
   
   def pretty_IEC_bytes(bytes)
-    return "%.1f TB" % (bytes.to_f / BYTES_IN_TiB) if bytes > BYTES_IN_TiB
-    return "%.1f GB" % (bytes.to_f / BYTES_IN_GiB) if bytes > BYTES_IN_GiB
-    return "%.1f MB" % (bytes.to_f / BYTES_IN_MiB) if bytes > BYTES_IN_MiB
-    return "%.1f KB" % (bytes.to_f / BYTES_IN_KiB) if bytes > BYTES_IN_KiB
+    return "%.1f TiB" % (bytes.to_f / BYTES_IN_TiB) if bytes > BYTES_IN_TiB
+    return "%.1f GiB" % (bytes.to_f / BYTES_IN_GiB) if bytes > BYTES_IN_GiB
+    return "%.1f MiB" % (bytes.to_f / BYTES_IN_MiB) if bytes > BYTES_IN_MiB
+    return "%.1f KiB" % (bytes.to_f / BYTES_IN_KiB) if bytes > BYTES_IN_KiB
     return "#{bytes} B"
   end
 
@@ -107,7 +107,7 @@ module Fsinv
   
     curr_dir = Fsinv::DirectoryDescription.new(folder_path, reduced_scan)
   
-    #begin
+    begin
       Pathname.new(folder_path).children.each { |f| 
         file = f.to_s.encode("UTF-8")
         if IGNORE_FILES.include?(File.basename(file))
@@ -126,9 +126,9 @@ module Fsinv
           curr_dir.item_count += 1 unless reduced_scan
         end
       }
-      #rescue
-      #puts "permission denied: #{curr_dir}" unless @options[:silent]
-      #end
+    rescue
+      puts "permission denied: #{curr_dir}" unless @options[:silent]
+    end
 
     return curr_dir
   end # parse
