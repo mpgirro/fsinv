@@ -150,7 +150,7 @@ if __FILE__ == $0
     begin
       require 'digest/crc32'
     rescue
-      puts "You have selected crc32 calculation option. This requires digest/crc32."
+      puts "You have selected crc32 calculation option. This requires gem 'digest/crc32'."
       puts "Install using 'gem install digest-crc'"
       exit
     end
@@ -160,7 +160,7 @@ if __FILE__ == $0
     begin
       require 'digest/md5'
     rescue
-      puts "You have selected md5 calculation option. This requires digest/md5."
+      puts "You have selected md5 calculation option. This requires gem 'digest/md5'."
       puts "Install using 'gem install digest'"
       exit
     end
@@ -202,6 +202,7 @@ if __FILE__ == $0
         end
       )
     end
+    
     puts "writing JSON to #{Fsinv.options[:json_file]}" unless Fsinv.options[:silent]
     
     begin
@@ -218,6 +219,7 @@ if __FILE__ == $0
       end
       
       json_data = Fsinv.inventory_to_json(inventory)
+      
       unless json_data.nil?
         begin       
           file = File.open(Fsinv.options[:json_file], 'w') 
@@ -386,8 +388,12 @@ if __FILE__ == $0
         end
       )
     end
+    
     puts "writing XML to #{Fsinv.options[:xml_file]}" unless Fsinv.options[:silent]
+
+    #$progressbar = ProgressBar.new(inventory.file_structure.inject{ |arr,item| arr + item.item_count }, :bar, :counter)
     xml_data = Fsinv.inventory_to_xml(inventory)
+    
     unless xml_data.nil?
       begin
         file = File.open(Fsinv.options[:xml_file], 'w') 
