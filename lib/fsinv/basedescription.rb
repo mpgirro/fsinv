@@ -1,4 +1,6 @@
 
+require 'fsinv'
+
 module Fsinv
 
   class BaseDescription
@@ -14,7 +16,7 @@ module Fsinv
         begin 
           @bytes = File.size(@path) 
         rescue 
-          puts "error: exception getting size for file #{path}" if @@options[:verbose]
+          puts "error: exception getting size for file #{path}" if Fsinv.options[:verbose]
           @bytes = 0
         end
       else
@@ -25,14 +27,14 @@ module Fsinv
         begin 
           @ctime = File.ctime(path) 
         rescue
-          puts "error getting creation time for file #{path}" if @@options[:verbose]
+          puts "error getting creation time for file #{path}" if Fsinv.options[:verbose]
           @ctime = "unavailable"
         end
       
         begin 
           @mtime = File.ctime(path) 
         rescue
-          puts "error getting modification time for file #{path}" if @@options[:verbose]
+          puts "error getting modification time for file #{path}" if Fsinv.options[:verbose]
           @mtime = "unavailable"
         end
         
