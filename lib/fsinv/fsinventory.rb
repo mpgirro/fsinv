@@ -1,6 +1,6 @@
 module Fsinv
 
-  class FsInventory
+  class Inventory
     
     include Fsinv
   

@@ -173,7 +173,7 @@ if __FILE__ == $0
     file_structure << Fsinv.parse(basepath)
   end
 
-  inventory = Fsinv::FsInventory.new(file_structure)
+  inventory = Fsinv::Inventory.new(file_structure)
   
   unless Fsinv.options[:silent]
     file_structure.each do |fs_tree|
