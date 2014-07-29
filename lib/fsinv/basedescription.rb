@@ -10,7 +10,7 @@ module Fsinv
     attr_accessor :path,:bytes,:ctime,:mtime,:osx_tags,:fshugo_tags
     
     def initialize(path, reduced_scan = false)
-      @path = path
+      @path = path.encode("UTF-8")
       
       @bytes = 0
       unless File.directory?(path)
