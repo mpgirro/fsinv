@@ -12,15 +12,9 @@ module Fsinv
     def initialize(path, reduced_scan = false)
       @path = path
       
+      @bytes = 0
       unless File.directory?(path)
-        begin 
-          @bytes = File.size(@path) 
-        rescue 
-          puts "error: exception getting size for file #{path}" if Fsinv.options[:verbose]
-          @bytes = 0
-        end
-      else
-        @bytes = 0
+        @bytes = File.size(@path) rescue (puts "error: exception getting size for file #{path}" if Fsinv.options[:verbose])
       end
       
       unless reduced_scan # don't do this if we only want to know file sizes (for pseudofiles, .git folders, etc)
