@@ -17,12 +17,14 @@ rescue LoadError
   exit
 end
 
-begin
-  require 'filemagic'
-rescue LoadError
-  puts "gem 'filemagic' required. Install it using 'gem install ruby-filemagic'"
-  puts "If you have trouble on OSX you may need to run 'brew install libmagic' before"
-  exit
+unless /darwin/.match(RUBY_PLATFORM) # == osx
+  begin
+    require 'filemagic'
+  rescue LoadError
+    puts "gem 'filemagic' required. Install it using 'gem install ruby-filemagic'"
+    puts "If you have trouble on OSX you may need to run 'brew install libmagic' before"
+    exit
+  end
 end
 
 begin
@@ -65,7 +67,7 @@ module Fsinv
   end
   
   @@options    = {}
-  @@fmagic     = FileMagic.new 
+  @@fmagic     = FileMagic.new unless /darwin/.match(RUBY_PLATFORM)
   @@magic_tab  = Fsinv::LookupTable.new
   @@mime_tab   = Fsinv::LookupTable.new
   @@osx_tab    = Fsinv::LookupTable.new

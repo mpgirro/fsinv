@@ -60,26 +60,36 @@ module Fsinv
     
     private
     def get_mime_id
-      begin
-        type_str = MIME::Types.type_for(@path).join(', ')
-        @@mime_tab.add(type_str) unless @@mime_tab.contains?(type_str)
-        return @@mime_tab.get_id(type_str)
-      rescue ArgumentError # if this happens you should definitly repair some file names
-        puts "error: mime type unavailable" unless @@options[:silent]
-        return nil
+      mime_type = ""
+      if /darwin/.match(RUBY_PLATFORM) # == osx
+        mime_type = %x{ file --mime -b \"#{@path}\" }.gsub("\n","")
+      else
+        begin
+          mime_type = MIME::Types.type_for(@path).join(', ')
+        rescue ArgumentError # if this happens you should definitly repair some file names
+          puts "error: mime type unavailable" unless @@options[:silent]
+        end
       end
+      
+      @@mime_tab.add(mime_type) unless @@mime_tab.contains?(mime_type)
+      return @@mime_tab.get_id(mime_type)
     end
     
     private
     def get_magic_descr_ids
-      begin 
-        description = sanitize_string(@@fmagic.file(@path))
-        @@magic_tab.add(description) unless @@magic_tab.contains?(description)
-        return @@magic_tab.get_id(description)
-      rescue
-        puts "error: file magic file information unavailable" unless @@options[:silent]
-        return nil
+      magic_descr = ""
+      if /darwin/.match(RUBY_PLATFORM) # == osx
+        magic_descr = %x{ file -b \"#{@path}\" }.gsub("\n","")
+      else # any other system
+        begin 
+          magic_descr = sanitize_string(@@fmagic.file(@path))
+        rescue
+          puts "error: file magic file information unavailable" unless @@options[:silent]
+        end
       end
+      
+      @@magic_tab.add(magic_descr) unless @@magic_tab.contains?(magic_descr)
+      return @@magic_tab.get_id(magic_descr)
     end
     
     private 
