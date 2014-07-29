@@ -50,10 +50,10 @@ module Fsinv
       p = sanitize_string(@path) rescue "path encoding broken" # there can be ArgumentError and UndefinedConversionError
       h = {
         "path" => p,
-        "bytes" => @bytes, 
-        'ctime' => @ctime, 
-        'mtime' => @mtime
+        "bytes" => @bytes
       }
+      h['ctime'] = @ctime unless @ctime.nil?
+      h['mtime'] = @mtime unless @mtime.nil?
       h["osx_tags"] = @osx_tags unless @osx_tags.empty?
       h["fshugo_tags"] = @fshugo_tags unless @fshugo_tags.empty?
       return h
