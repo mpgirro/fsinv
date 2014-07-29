@@ -28,14 +28,14 @@ module Fsinv
           @ctime = File.ctime(path) 
         rescue
           puts "error getting creation time for file #{path}" if Fsinv.options[:verbose]
-          @ctime = "unavailable"
+          @ctime = nil
         end
       
         begin 
           @mtime = File.ctime(path) 
         rescue
           puts "error getting modification time for file #{path}" if Fsinv.options[:verbose]
-          @mtime = "unavailable"
+          @mtime = nil
         end
         
         @osx_tags = osx_tag_ids(path) if /darwin/.match(RUBY_PLATFORM) # == osx
