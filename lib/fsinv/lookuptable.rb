@@ -45,6 +45,12 @@ module Fsinv
       end
       return table_arr
     end
+    
+    def from_json(json)
+      json.each do |entry|
+        self.add(entry["value"]) unless self.contains?(entry["value"])
+      end
+    end
   
     def as_json(options = { })
       return to_a
