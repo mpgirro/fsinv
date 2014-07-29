@@ -24,8 +24,8 @@ module Fsinv
       end
       
       unless reduced_scan # don't do this if we only want to know file sizes (for pseudofiles, .git folders, etc)
-        @ctime = File.ctime(path) rescue puts "error getting creation time for file #{path}" if Fsinv.options[:verbose]
-        @mtime = File.ctime(path) rescue puts "error getting modification time for file #{path}" if Fsinv.options[:verbose]
+        @ctime = File.ctime(path) rescue (puts "error getting creation time for file #{path}" if Fsinv.options[:verbose])
+        @mtime = File.ctime(path) rescue (puts "error getting modification time for file #{path}" if Fsinv.options[:verbose])
         @osx_tags = osx_tag_ids(path) if /darwin/.match(RUBY_PLATFORM) # == osx
         @fshugo_tags = fshugo_tag_ids(path)
       else
