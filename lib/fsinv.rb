@@ -73,6 +73,8 @@ module Fsinv
   Fsinv.osx_tab    = Fsinv::LookupTable.new
   Fsinv.fshugo_tab = Fsinv::LookupTable.new
   
+  module_function # all following methods will be callable from outside the module
+  
   # tries to handle various encoding problems encounterd with path strings
   def sanitize_string(string)
     return string.encode("UTF-16BE", :invalid=>:replace, :undef => :replace, :replace=>"?")
@@ -80,9 +82,7 @@ module Fsinv
                  .gsub(/[\u0080-\u009F]/) {|x| x.getbyte(1).chr.force_encoding('windows-1252').encode('utf-8') }
                  .gsub(/\"/, "\\\"") # escape double quotes in string
   end
-  
-  module_function # all following methods will be callable from outside the module
-  
+
   def pretty_SI_bytes(bytes)
     return "%.1f TB" % (bytes.to_f / BYTES_IN_TB) if bytes > BYTES_IN_TB
     return "%.1f GB" % (bytes.to_f / BYTES_IN_GB) if bytes > BYTES_IN_GB
