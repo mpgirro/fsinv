@@ -79,7 +79,7 @@ module Fsinv
     def get_magic_descr_ids
       magic_descr = ""
       if /darwin/.match(RUBY_PLATFORM) # == osx
-        magic_descr = %x{ file -b \"#{@path}\" }.gsub("\n","")
+        magic_descr = %x{ file -b \"#{@path}\" }
       else # any other system
         begin 
           magic_descr = sanitize_string(Fsinv.fmagic.file(@path))
@@ -87,6 +87,8 @@ module Fsinv
           puts "error: file magic file information unavailable" unless Fsinv.options[:silent]
         end
       end
+      
+      magic_descr = Fsinv.sanitize_string(magic_descr).gsub("\n","").gsub("\\\"", "'")
       
       Fsinv.magic_tab.add(magic_descr) unless Fsinv.magic_tab.contains?(magic_descr)
       return Fsinv.magic_tab.get_id(magic_descr)
