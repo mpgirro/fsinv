@@ -79,8 +79,8 @@ module Fsinv
       else
         tag_ids = []
         tags.each do |tag|
-          @@osx_tab.add(tag) unless @@osx_tab.contains?(tag)
-          tag_ids << @@osx_tab.get_id(tag)
+          Fsinv.osx_tab.add(tag) unless Fsinv.osx_tab.contains?(tag)
+          tag_ids << Fsinv.osx_tab.get_id(tag)
         end
         return tag_ids
       end
@@ -93,8 +93,8 @@ module Fsinv
         tags = xattr["fshugo"].split(";") 
         tag_ids = []
         tags.each do |tag|
-          @@fshugo_tab.add(tag) unless @@fshugo_tab.contains?(tag)
-          tag_ids << @@fshugo_tab.get_id(tag)
+          Fsinv.fshugo_tab.add(tag) unless Fsinv.fshugo_tab.contains?(tag)
+          tag_ids << Fsinv.fshugo_tab.get_id(tag)
         end
         return tag_ids
         #return tags

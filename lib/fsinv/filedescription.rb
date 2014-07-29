@@ -22,8 +22,8 @@ module Fsinv
     end # initialize
   
     def to_hash
-      h = super.to_hash
-      h["type"] = "file"
+      h = { "type" => "file" }
+      h = h.merge(super.to_hash)
       h["mimetype"] = @mimetype unless @mimetype.nil?
       h["magicdescr"] = @magicdescr unless @magicdescr.nil?
       h["crc32"] = @crc32 unless @crc32.nil?
@@ -67,12 +67,12 @@ module Fsinv
         begin
           mime_type = MIME::Types.type_for(@path).join(', ')
         rescue ArgumentError # if this happens you should definitly repair some file names
-          puts "error: mime type unavailable" unless @@options[:silent]
+          puts "error: mime type unavailable" unless Fsinv.options[:silent]
         end
       end
       
-      @@mime_tab.add(mime_type) unless @@mime_tab.contains?(mime_type)
-      return @@mime_tab.get_id(mime_type)
+      Fsinv.mime_tab.add(mime_type) unless Fsinv.mime_tab.contains?(mime_type)
+      return Fsinv.mime_tab.get_id(mime_type)
     end
     
     private
@@ -82,23 +82,23 @@ module Fsinv
         magic_descr = %x{ file -b \"#{@path}\" }.gsub("\n","")
       else # any other system
         begin 
-          magic_descr = sanitize_string(@@fmagic.file(@path))
+          magic_descr = sanitize_string(Fsinv.fmagic.file(@path))
         rescue
-          puts "error: file magic file information unavailable" unless @@options[:silent]
+          puts "error: file magic file information unavailable" unless Fsinv.options[:silent]
         end
       end
       
-      @@magic_tab.add(magic_descr) unless @@magic_tab.contains?(magic_descr)
-      return @@magic_tab.get_id(magic_descr)
+      Fsinv.magic_tab.add(magic_descr) unless Fsinv.magic_tab.contains?(magic_descr)
+      return Fsinv.magic_tab.get_id(magic_descr)
     end
     
     private 
     def calc_crc32
-      if @@options[:crc32]
+      if Fsinv.options[:crc32]
         begin
           return Digest::CRC32.file(@path).hexdigest
         rescue
-          puts "error calculating crc32 for #{path}" if @@options[:verbose]
+          puts "error calculating crc32 for #{path}" if Fsinv.options[:verbose]
           return nil
         end
       end
@@ -107,11 +107,11 @@ module Fsinv
     
     private 
     def calc_md5
-      if @@options[:md5]
+      if Fsinv.options[:md5]
         begin
           return Digest::MD5.file(@path).hexdigest
         rescue
-          puts "error calculating md5 for #{path}" if @@options[:verbose]
+          puts "error calculating md5 for #{path}" if Fsinv.options[:verbose]
           return nil
         end
       end

@@ -66,12 +66,12 @@ module Fsinv
     attr_accessor :options, :fmagic, :mime_tab, :magic_tab, :osx_tab, :fshugo_tab
   end
   
-  @@options    = {}
-  @@fmagic     = FileMagic.new unless /darwin/.match(RUBY_PLATFORM)
-  @@magic_tab  = Fsinv::LookupTable.new
-  @@mime_tab   = Fsinv::LookupTable.new
-  @@osx_tab    = Fsinv::LookupTable.new
-  @@fshugo_tab = Fsinv::LookupTable.new
+  Fsinv.options    = {}
+  Fsinv.fmagic     = FileMagic.new unless /darwin/.match(RUBY_PLATFORM)
+  Fsinv.magic_tab  = Fsinv::LookupTable.new
+  Fsinv.mime_tab   = Fsinv::LookupTable.new
+  Fsinv.osx_tab    = Fsinv::LookupTable.new
+  Fsinv.fshugo_tab = Fsinv::LookupTable.new
   
   # tries to handle various encoding problems encounterd with path strings
   def sanitize_string(string)
@@ -165,7 +165,7 @@ module Fsinv
       mime_id = MimeType.where(:mimetype => mime_descr).ids.first
       h[:mimetype] = mime_id
     
-      magic_descr = @@magic_tab.get_value(structitem.magicdescr)
+      magic_descr = Fsinv.magic_tab.get_value(structitem.magicdescr)
       magic_id = MagicDescription.where(:magicdescr => magic_descr).ids.first
       h[:magicdescr] = magic_id
     end
@@ -173,7 +173,7 @@ module Fsinv
     osx_tags = [] # will be array of db ids
     unless structitem.osx_tags.nil?
       structitem.osx_tags.each do |json_id|
-        tag = @@osx_tab.get_value(json_id)
+        tag = Fsinv.osx_tab.get_value(json_id)
         osx_tags << OsxTag.where(:tag => tag).ids.first
       end
     end
@@ -182,7 +182,7 @@ module Fsinv
     fshugo_tags = [] # will be array of db ids
     unless structitem.fshugo_tags.nil?
       structitem.fshugo_tags.each do |json_id|
-        tag = @@fshugo_tab.get_value(json_id)
+        tag = Fsinv.fshugo_tab.get_value(json_id)
         fshugo_tags << FshugoTag.where(:tag => tag).ids.first
       end
     end

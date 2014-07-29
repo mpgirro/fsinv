@@ -12,10 +12,10 @@ module Fsinv
     def initialize(file_structure)
       @file_structure = file_structure
       @timestamp  = Time.now
-      @magic_tab  = @@magic_tab
-      @mime_tab   = @@mime_tab
-      @osx_tab    = @@osx_tab
-      @fshugo_tab = @@fshugo_tab
+      @magic_tab  = Fsinv.magic_tab
+      @mime_tab   = Fsinv.mime_tab
+      @osx_tab    = Fsinv.osx_tab
+      @fshugo_tab = Fsinv.fshugo_tab
     end 
   
     def size

@@ -19,8 +19,8 @@ module Fsinv
     end # initialize
     
     def to_hash
-      h = super.to_hash
-      h["type"] = "directory"
+      h = { "type" => "directory" }
+      h = h.merge(super.to_hash)
       h["file_count"] = @file_count
       h["item_count"] = @item_count
       h["file_list"] = @file_list
