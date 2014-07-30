@@ -16,7 +16,7 @@ module Fsinv
     def add(value)
       if self.contains?(value)
         return get_id(value)
-      elsif value == ""
+      elsif value == "" || value == nil
         return nil
       else
         @idcursor += 1
