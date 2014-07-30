@@ -44,11 +44,11 @@ module Fsinv
 
     def marshal_load(data)
       self.path = data['path']
-      self.bytes = data['bytes']
-      self.ctime = data['ctime']
-      self.mtime = data['mtime']
-      self.file_count = data['file_count']
-      self.item_count = data['item_count']
+      self.bytes = data['bytes'] 
+      self.ctime = data['ctime'] if data['ctime'].exists?
+      self.mtime = data['mtime'] if data['mtime'].exists?
+      self.file_count = data['file_count'] if data['file_count'].exists?
+      self.item_count = data['item_count'] if data['item_count'].exists?
       self.osx_tags = data['osx_tags'] if data['osx_tags'].exists?
       self.fshugo_tags = data['fshugo_tags'] if data['fshugo_tags'].exists?
       self.file_list = data['file_list']
