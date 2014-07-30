@@ -107,13 +107,13 @@ module Fsinv
     elsif File.basename(folder_path)[0..1] == "._"
       # these are some osx files no one cares about -> ignore
     elsif PSEUDO_FILES.include?(File.extname(folder_path)) # stuff like .app, .bundle, .mbox etc.
-      puts "processing reduced_scan #{folder_path}" unless reduced_scan || @options[:silent]
+      puts "processing reduced_scan #{folder_path}" unless reduced_scan || Fsinv.options[:silent]
       reduced_scan = true
     elsif File.basename(folder_path)[0] == "."
-      puts "processing dotfile #{folder_path}" unless reduced_scan || @options[:silent]
+      puts "processing dotfile #{folder_path}" unless reduced_scan || Fsinv.options[:silent]
       reduced_scan = true
     else
-      puts "processing #{folder_path}/*" unless reduced_scan || @options[:silent]
+      puts "processing #{folder_path}/*" unless reduced_scan || Fsinv.options[:silent]
     end
   
     curr_dir = Fsinv::DirectoryDescription.new(folder_path, reduced_scan)
@@ -130,7 +130,7 @@ module Fsinv
           curr_dir.item_count += 1 # count this directory as an item
           curr_dir.item_count += sub_folder.item_count unless reduced_scan
         else
-          puts "processing #{file}" if @options[:verbose] && !reduced_scan && @options[:silent].nil?
+          puts "processing #{file}" if Fsinv.options[:verbose] && !reduced_scan && Fsinv.options[:silent].nil?
           sub_file = Fsinv::FileDescription.new(file, reduced_scan)
           curr_dir.bytes += sub_file.bytes
           curr_dir.file_list << sub_file unless reduced_scan
@@ -138,7 +138,7 @@ module Fsinv
         end
       }
       #rescue
-      #puts "permission denied: #{folder_path}" unless @options[:silent]
+      #puts "permission denied: #{folder_path}" unless Fsinv.options[:silent]
       #end
 
     return curr_dir
@@ -161,7 +161,8 @@ module Fsinv
       h[:item_count] = structitem.item_count
     when FileDescription
       h[:entity_type] = "file"
-      mime_descr = @@mime_tab.get_value(structitem.mimetype)
+      
+      mime_descr = Fsinv.mime_tab.get_value(structitem.mimetype)
       mime_id = MimeType.where(:mimetype => mime_descr).ids.first
       h[:mimetype] = mime_id
     
@@ -198,7 +199,7 @@ module Fsinv
   def inventory_to_json(inventory)
     json_data = nil
     begin 
-      #require 'json'
+      require 'json'
       json_data = JSON.parse(inventory.to_json(max_nesting: 100))
       json_data = JSON.pretty_generate(json_data, :max_nesting => 100) 
     rescue LoadError
