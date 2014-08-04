@@ -136,7 +136,7 @@ module Fsinv
         else
           puts "processing #{file}" if Fsinv.options[:verbose] && !reduced_scan && Fsinv.options[:silent].nil?
           sub_file = Fsinv::FileDescription.new(file, reduced_scan)
-          curr_dir.bytes += sub_file.bytes unless sub_file.nil?
+          curr_dir.bytes += sub_file.bytes 
           curr_dir.file_list << sub_file unless reduced_scan
           curr_dir.item_count += 1 unless reduced_scan
         end

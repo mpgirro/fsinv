@@ -13,9 +13,6 @@ module Fsinv
       @path = path.encode("UTF-8")
       
       @bytes = 0
-      unless File.directory?(path)
-        @bytes = File.size(@path) rescue (puts "error: exception getting size for file #{path}" if Fsinv.options[:verbose])
-      end
       
       unless reduced_scan # don't do this if we only want to know file sizes (for pseudofiles, .git folders, etc)
         @ctime = File.ctime(path) rescue (puts "error getting creation time for file #{path}" if Fsinv.options[:verbose])
