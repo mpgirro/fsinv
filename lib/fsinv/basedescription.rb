@@ -20,7 +20,7 @@ module Fsinv
       unless reduced_scan # don't do this if we only want to know file sizes (for pseudofiles, .git folders, etc)
         @ctime = File.ctime(path) rescue (puts "error getting creation time for file #{path}" if Fsinv.options[:verbose])
         @mtime = File.ctime(path) rescue (puts "error getting modification time for file #{path}" if Fsinv.options[:verbose])
-        @osx_tags = osx_tag_ids(path) if /darwin/.match(RUBY_PLATFORM) # == osx
+        @osx_tags = osx_tag_ids(path) 
         @fshugo_tags = fshugo_tag_ids(path)
       else
         @osx_tags = []
@@ -50,6 +50,15 @@ module Fsinv
     end
     
     def osx_tag_ids(file_path)
+      
+      # well, we can only that if we are on osx, for the 
+      # mechanism used is only avalable on that plattform
+      return [] unless /darwin/.match(RUBY_PLATFORM) # == osx
+      
+      # if we had problem loading (or installing) ffi-xattr
+      # don't do the tags thing at all (fixes FreeBSD bug)
+      return [] unless Fsinv.options[:xattr]
+      
       # array with the kMDItemUserTags strings 
       # of the extended file attributes of 'path'
       tags = %x{mdls -name 'kMDItemUserTags' -raw "#{file_path}"|tr -d "()\n"}.split(',').map { |tag| 
@@ -70,6 +79,11 @@ module Fsinv
 
 
     def fshugo_tag_ids(file_path)
+      
+      # if we had problem loading (or installing) ffi-xattr
+      # don't do the tags thing at all (fixes FreeBSD bug)
+      return [] unless Fsinv.options[:xattr]
+      
       xattr = Xattr.new(file_path)
       unless xattr["fshugo"].nil?
         tags = xattr["fshugo"].split(";") 

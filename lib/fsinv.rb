@@ -27,12 +27,7 @@ unless /darwin/.match(RUBY_PLATFORM) # == osx
   end
 end
 
-begin
-  require 'ffi-xattr'
-rescue LoadError
-  puts "gem 'ffi-xattr' required. Install it using 'gem install ffi-xattr'"
-  exit
-end
+
 
 module Fsinv
   
@@ -72,6 +67,15 @@ module Fsinv
   Fsinv.mime_tab   = Fsinv::LookupTable.new
   Fsinv.osx_tab    = Fsinv::LookupTable.new
   Fsinv.fshugo_tab = Fsinv::LookupTable.new
+  
+  begin
+    require 'ffi-xattr'
+    Fsinv.options[:xattr] = true
+  rescue LoadError
+    puts "gem 'ffi-xattr' required. Install it using 'gem install ffi-xattr'"
+    Fsinv.options[:xattr] = false
+    #exit
+  end
   
   module_function # all following methods will be callable from outside the module
   
