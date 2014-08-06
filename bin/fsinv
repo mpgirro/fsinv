@@ -52,19 +52,19 @@ if __FILE__ == $0
     end
     opts.separator ""
     
-    opts.on("-b", "--binary [FILE]", "Dump iventory data stuctures in binary format. 
+    opts.on("--binary [FILE]", "Dump iventory data stuctures in binary format. 
                                      Default destination is ~/#{DEFAULT_NAME}.bin") do |binary_file|
       Fsinv.options[:binary] = true
       Fsinv.options[:binary_file] = binary_file
     end
     opts.separator ""
     
-    opts.on("-c", "--crc32", "Calculate CRC32 checksum for each file") do |crc|
+    opts.on("--crc32", "Calculate CRC32 checksum for each file") do |crc|
       Fsinv.options[:crc32] = true
     end
     opts.separator ""
     
-    opts.on("-d", "--db [FILE]", "Save inventory as SQLite database. 
+    opts.on("--db [FILE]", "Save inventory as SQLite database. 
                                      Default destination is ~/#{DEFAULT_NAME}.db") do |sql_file|
       Fsinv.options[:db] = true
       Fsinv.options[:db_file] = sql_file 
@@ -75,6 +75,7 @@ if __FILE__ == $0
       puts opts
       exit
     end
+    opts.separator ""
   
     opts.on("-j", "--json [FILE]", "Save inventory in JSON file format. 
                                      Default destination is ~/#{DEFAULT_NAME}.json") do |json_file|
@@ -83,7 +84,7 @@ if __FILE__ == $0
     end
     opts.separator ""
     
-    opts.on("-m", "--md5", "Calculate MD5 hash for each file") do |md5|
+    opts.on("--md5", "Calculate MD5 hash for each file") do |md5|
       Fsinv.options[:md5] = true
     end
     opts.separator ""
@@ -112,15 +113,21 @@ if __FILE__ == $0
       Fsinv.options[:verbose] = v
     end
     opts.separator ""
+    
+    opts.on_tail("--version", "Show version") do
+      puts ::Version.join('.')
+      exit
+    end
+    opts.separator ""
   
-    opts.on("-x", "--xml [FILE]", "Save inventory in XML file format. 
+    opts.on("--xml [FILE]", "Save inventory in XML file format. 
                                      Default destination is ~/#{DEFAULT_NAME}.xml") do |xml_file|
       Fsinv.options[:xml] = true
       Fsinv.options[:xml_file] = xml_file 
     end
     opts.separator ""
   
-    opts.on("-y", "--yaml [FILE]", "Save inventory in YAML file format. 
+    opts.on("--yaml [FILE]", "Save inventory in YAML file format. 
                                      Default destination is ~/#{DEFAULT_NAME}.yaml") do |yaml_file|
       Fsinv.options[:yaml] = true
       Fsinv.options[:yaml_file] = yaml_file
@@ -137,7 +144,7 @@ if __FILE__ == $0
     puts USAGE
     exit
   end
-
+  
   ARGV.each do |arg|
     unless File.directory?(arg)
       puts "Not a directory: #{arg}"
@@ -166,8 +173,6 @@ if __FILE__ == $0
     end
   end
   
-  
-
   file_structure = []
   ARGV.each do |basepath|
     file_structure << Fsinv.parse(basepath)
@@ -192,7 +197,7 @@ if __FILE__ == $0
   end
 
   # this is the default output
-  unless (Fsinv.options[:binary]||Fsinv.options[:db]||Fsinv.options[:xml]||Fsinv.options[:yaml]) && Fsinv.options[:json].nil?
+  unless (Fsinv.options[:binary] || Fsinv.options[:db] || Fsinv.options[:xml] || Fsinv.options[:yaml]) && Fsinv.options[:json].nil?
     if Fsinv.options[:json_file].nil?
       Fsinv.options[:json_file] = File.join(Dir.home,
         if Fsinv.options[:name].nil?
