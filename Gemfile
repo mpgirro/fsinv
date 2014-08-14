@@ -1,13 +1,4 @@
 source 'https://rubygems.org'
-ruby '1.9.3'
-gem 'pathname'
-gem 'ruby-filemagic'
-gem 'mime'
-gem 'json' 
-gem 'yaml'
-gem 'nokogiri'
-gem 'sqlite3'
-gem 'optparse'
-gem 'ffi-xattr'
-gem 'digest-crc'
-gem 'active_record', '>=3.2.12'
+
+# Specify your gem's dependencies in fsinv.gemspec
+gemspec
