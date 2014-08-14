@@ -19,8 +19,8 @@ Gem::Specification.new do |spec|
   spec.require_paths = ['lib']
    
   spec.required_ruby_version = '>= 1.9.3'  
-  spec.add_dependency 'active_record', '~> 3.2', '>=3.2.12'
-  spec.add_dependency 'mime', '~> 2.2'
+  spec.add_dependency 'activerecord', '~> 3.2', '>=3.2.12'
+  spec.add_dependency 'mime-types', '~> 2.2', '>= 1.21'
   spec.add_dependency 'nokogiri', '~> 1.6', '>= 1.6.2.1'
   spec.add_dependency 'ruby-filemagic', '~> 0.6', '>= 0.6.0'
   spec.add_dependency 'sqlite3', '~> 1.3', '>= 1.3.7'
