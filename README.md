@@ -1,5 +1,7 @@
 # fsinv: file system inventory tool
 
+[![Gem Version](https://badge.fury.io/rb/fsinv.svg)](http://badge.fury.io/rb/fsinv)
+
 imagine a very detailed README message here (please?)
 
 ## Installation
