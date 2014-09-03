@@ -6,9 +6,9 @@ require 'optparse'
 require 'fsinv'
 
 DEFAULT_NAME = "inventory"
-USAGE = "Usage: fsinv basepath1 [basepath2 [basepath3 [...]]] [options]"
+USAGE = "Usage: fsinv [options] basepath1 [basepath2 [basepath3 [...]]] "
 
-Fsinv.options = {}
+Fsinv::options = {}
 OptionParser.new do |opts|
   opts.banner = USAGE
   opts.separator ""
@@ -39,102 +39,92 @@ OptionParser.new do |opts|
   opts.separator "Specific options:"
   opts.separator ""
   
-  opts.on("-a", "--all", "Save in all formats to the default destinations. 
-                                   Equal to -b -j -q -x -y. Use -n to change the 
-                                   file names of all target at once") do |all_flag|
-    Fsinv.options[:binary]  = true
-    Fsinv.options[:json]    = true
-    Fsinv.options[:db]      = true
-    Fsinv.options[:xml]     = true
-    Fsinv.options[:yaml]    = true
+  opts.on("-a", "--all", "Save in all formats to the default destinations.", 
+                         "Equal to -b -j -q -x -y. Use -n to change the ",
+                         "file names of all inventorys at once.") do |all_flag|
+    Fsinv::options[:binary]  = true
+    Fsinv::options[:json]    = true
+    Fsinv::options[:db]      = true
+    Fsinv::options[:xml]     = true
+    Fsinv::options[:yaml]    = true
   end
-  opts.separator ""
+  #opts.separator ""
   
-  opts.on("--binary [FILE]", "Dump iventory data stuctures in binary format. 
-                                   Default destination is ~/#{DEFAULT_NAME}.bin") do |binary_file|
-    Fsinv.options[:binary] = true
-    Fsinv.options[:binary_file] = binary_file
+  opts.on("--binary [FILE]", "Dump inventory data in binary format. Default is ~/#{DEFAULT_NAME}.bin") do |binary_file|
+    Fsinv::options[:binary] = true
+    Fsinv::options[:binary_file] = binary_file
   end
-  opts.separator ""
+  #opts.separator ""
   
   opts.on("--crc32", "Calculate CRC32 checksum for each file") do |crc|
-    Fsinv.options[:crc32] = true
+    Fsinv::options[:crc32] = true
   end
-  opts.separator ""
+  #opts.separator ""
   
-  opts.on("--db [FILE]", "Save inventory as SQLite database. 
-                                   Default destination is ~/#{DEFAULT_NAME}.db") do |sql_file|
-    Fsinv.options[:db] = true
-    Fsinv.options[:db_file] = sql_file 
+  opts.on("--db [FILE]", "Save inventory as SQLite database. Default is ~/#{DEFAULT_NAME}.db") do |sql_file|
+    Fsinv::options[:db] = true
+    Fsinv::options[:db_file] = sql_file 
   end
-  opts.separator ""
+  #opts.separator ""
 
-  opts.on_tail("-h", "--help", "Show this message") do
-    puts opts
-    exit
+  opts.on("-j", "--json [FILE]", "Save inventory in JSON file format. Default is ~/#{DEFAULT_NAME}.json") do |json_file|
+    Fsinv::options[:json] = true
+    Fsinv::options[:json_file] = json_file
   end
-  opts.separator ""
-
-  opts.on("-j", "--json [FILE]", "Save inventory in JSON file format. 
-                                   Default destination is ~/#{DEFAULT_NAME}.json") do |json_file|
-    Fsinv.options[:json] = true
-    Fsinv.options[:json_file] = json_file
-  end
-  opts.separator ""
+  #opts.separator ""
   
   opts.on("--md5", "Calculate MD5 hash for each file") do |md5|
-    Fsinv.options[:md5] = true
+    Fsinv::options[:md5] = true
   end
-  opts.separator ""
+  #opts.separator ""
 
-  opts.on("-n", "--name NAME", "This will change the name of the output files. 
-                                   Default is '#{DEFAULT_NAME}'. Specific targets for 
-                                   file formats will overwrite this.") do |name|
-    Fsinv.options[:name] = name
+  opts.on("-n", "--name NAME", "Change outputfile name. Default is '#{DEFAULT_NAME}'.", 
+                               "Specific targets for file formats will overwrite this.") do |name|
+    Fsinv::options[:name] = name
   end
-  opts.separator ""
+  #opts.separator ""
 
   opts.on("-p", "--print FORMAT", [:json, :yaml, :xml], "Print a format to stdout (json|yaml|xml)") do |format|
-    Fsinv.options[:print] = true
-    Fsinv.options[:print_format] = format
+    Fsinv::options[:print] = true
+    Fsinv::options[:print_format] = format
   end
-  opts.separator ""
+  #opts.separator ""
 
-  opts.on("-s", "--silent", "Run in silent mode. No output or non-critical 
-                                   error messages will be printed") do |s|
-    Fsinv.options[:silent] = s
+  opts.on("-s", "--silent", "No output or non-critical error messages will be printed") do |s|
+    Fsinv::options[:silent] = s
   end
-  opts.separator ""
+  #opts.separator ""
 
-  opts.on("-v", "--verbose", "Run verbosely. This will output processed 
-                                   filenames and error messages too") do |v|
-    Fsinv.options[:verbose] = v
+  opts.on("-v", "--verbose", "Output processed filenames and non-critical errors too") do |v|
+    Fsinv::options[:verbose] = v
   end
-  opts.separator ""
+  #opts.separator ""
+  
+  opts.on("--xml [FILE]", "Save inventory in XML file format. Default is ~/#{DEFAULT_NAME}.xml") do |xml_file|
+    Fsinv::options[:xml] = true
+    Fsinv::options[:xml_file] = xml_file 
+  end
+  #opts.separator ""
+
+  opts.on("--yaml [FILE]", "Save inventory in YAML file format. Default is ~/#{DEFAULT_NAME}.yaml") do |yaml_file|
+    Fsinv::options[:yaml] = true
+    Fsinv::options[:yaml_file] = yaml_file
+  end
+  #opts.separator ""
   
   opts.on_tail("--version", "Show version") do
     puts ::Version.join('.')
     exit
   end
-  opts.separator ""
-
-  opts.on("--xml [FILE]", "Save inventory in XML file format. 
-                                   Default destination is ~/#{DEFAULT_NAME}.xml") do |xml_file|
-    Fsinv.options[:xml] = true
-    Fsinv.options[:xml_file] = xml_file 
+  
+  opts.on_tail("-h", "--help", "Show this message") do
+    puts opts
+    exit
   end
-  opts.separator ""
-
-  opts.on("--yaml [FILE]", "Save inventory in YAML file format. 
-                                   Default destination is ~/#{DEFAULT_NAME}.yaml") do |yaml_file|
-    Fsinv.options[:yaml] = true
-    Fsinv.options[:yaml_file] = yaml_file
-  end
-  opts.separator ""
   
 end.parse! # do the parsing. do it now!
 
-#p Fsinv.options
+#p Fsinv::options
 #p ARGV
 
 if ARGV[0].nil? 
@@ -151,7 +141,7 @@ ARGV.each do |arg|
   end 
 end
 
-if Fsinv.options[:crc32]
+if Fsinv::options[:crc32]
   begin
     require 'digest/crc32'
   rescue
@@ -161,7 +151,7 @@ if Fsinv.options[:crc32]
   end
 end
 
-if Fsinv.options[:md5] 
+if Fsinv::options[:md5] 
   begin
     require 'digest/md5'
   rescue
@@ -178,7 +168,7 @@ end
 
 inventory = Fsinv::Inventory.new(file_structure)
 
-unless Fsinv.options[:silent]
+unless Fsinv::options[:silent]
   file_structure.each do |fs_tree|
     size = fs_tree.bytes
     puts "basepath: #{fs_tree.path}"
@@ -195,18 +185,18 @@ unless Fsinv.options[:silent]
 end
 
 # this is the default output
-unless (Fsinv.options[:binary] || Fsinv.options[:db] || Fsinv.options[:xml] || Fsinv.options[:yaml]) && Fsinv.options[:json].nil?
-  if Fsinv.options[:json_file].nil?
-    Fsinv.options[:json_file] = File.join(Dir.home,
-      if Fsinv.options[:name].nil?
+unless (Fsinv::options[:binary] || Fsinv::options[:db] || Fsinv::options[:xml] || Fsinv::options[:yaml]) && Fsinv::options[:json].nil?
+  if Fsinv::options[:json_file].nil?
+    Fsinv::options[:json_file] = File.join(Dir.home,
+      if Fsinv::options[:name].nil?
         "#{DEFAULT_NAME}.json"
       else 
-        "#{Fsinv.options[:name]}.json"
+        "#{Fsinv::options[:name]}.json"
       end
     )
   end
   
-  puts "writing JSON to #{Fsinv.options[:json_file]}" unless Fsinv.options[:silent]
+  puts "writing JSON to #{Fsinv::options[:json_file]}" unless Fsinv::options[:silent]
   
   begin
     require 'json'
@@ -225,7 +215,7 @@ unless (Fsinv.options[:binary] || Fsinv.options[:db] || Fsinv.options[:xml] || F
     
     unless json_data.nil?
       begin       
-        file = File.open(Fsinv.options[:json_file], 'w') 
+        file = File.open(Fsinv::options[:json_file], 'w') 
         file.write(json_data)
       rescue
         puts "error writing JSON file"
@@ -238,21 +228,21 @@ unless (Fsinv.options[:binary] || Fsinv.options[:db] || Fsinv.options[:xml] || F
   end
 end
 
-if Fsinv.options[:yaml]
-  if Fsinv.options[:yaml_file].nil?
-    Fsinv.options[:yaml_file] = File.join(Dir.home,
-      if Fsinv.options[:name].nil?
+if Fsinv::options[:yaml]
+  if Fsinv::options[:yaml_file].nil?
+    Fsinv::options[:yaml_file] = File.join(Dir.home,
+      if Fsinv::options[:name].nil?
         "#{DEFAULT_NAME}.yaml"
       else
-        "#{Fsinv.options[:name]}.yaml"
+        "#{Fsinv::options[:name]}.yaml"
       end
     )
   end
-  puts "writing YAML to #{Fsinv.options[:yaml_file]}" unless Fsinv.options[:silent]
+  puts "writing YAML to #{Fsinv::options[:yaml_file]}" unless Fsinv::options[:silent]
   yaml_data = Fsinv.inventory_to_yaml(inventory)
   unless yaml_data.nil?
     begin
-      file = File.open(Fsinv.options[:yaml_file], 'w') 
+      file = File.open(Fsinv::options[:yaml_file], 'w') 
       file.write(yaml_data)
     rescue
       puts "error writing YAML file"
@@ -262,19 +252,19 @@ if Fsinv.options[:yaml]
   end
 end
 
-if Fsinv.options[:binary]
-  if Fsinv.options[:binary_file].nil?
-    Fsinv.options[:binary_file] = File.join(Dir.home,
-      if Fsinv.options[:name].nil?
+if Fsinv::options[:binary]
+  if Fsinv::options[:binary_file].nil?
+    Fsinv::options[:binary_file] = File.join(Dir.home,
+      if Fsinv::options[:name].nil?
         "#{DEFAULT_NAME}.bin"
       else
-        "#{Fsinv.options[:name]}.bin"
+        "#{Fsinv::options[:name]}.bin"
       end
     )
   end
-  puts "writing binary dump to #{Fsinv.options[:binary_file]}" unless Fsinv.options[:silent]
+  puts "writing binary dump to #{Fsinv::options[:binary_file]}" unless Fsinv::options[:silent]
   begin
-    file = File.open(Fsinv.options[:binary_file], 'wb') 
+    file = File.open(Fsinv::options[:binary_file], 'wb') 
     file.write(Marshal.dump(inventory))
   rescue
     puts "error writing binary dump file"
@@ -283,19 +273,19 @@ if Fsinv.options[:binary]
   end
 end
 
-if Fsinv.options[:db]
-  if Fsinv.options[:db_file].nil?
-    Fsinv.options[:db_file] = File.join(Dir.home,
-      if Fsinv.options[:name].nil?
+if Fsinv::options[:db]
+  if Fsinv::options[:db_file].nil?
+    Fsinv::options[:db_file] = File.join(Dir.home,
+      if Fsinv::options[:name].nil?
         "#{DEFAULT_NAME}.db"
       else
-        "#{Fsinv.options[:name]}.db"
+        "#{Fsinv::options[:name]}.db"
       end
     )
   end
 
-  puts "writing database dump to #{Fsinv.options[:db_file]}" unless Fsinv.options[:silent]
-  `rm #{Fsinv.options[:db_file]}` if File.exists?(Fsinv.options[:db_file])
+  puts "writing database dump to #{Fsinv::options[:db_file]}" unless Fsinv::options[:silent]
+  `rm #{Fsinv::options[:db_file]}` if File.exists?(Fsinv::options[:db_file])
 
   begin
     
@@ -303,7 +293,7 @@ if Fsinv.options[:db]
 
     ActiveRecord::Base.establish_connection(
         :adapter => "sqlite3",
-        :database  => Fsinv.options[:db_file]
+        :database  => Fsinv::options[:db_file]
     )
     
     ActiveRecord::Schema.define do
@@ -381,25 +371,25 @@ if Fsinv.options[:db]
   end
 end
 
-if Fsinv.options[:xml]
-  if Fsinv.options[:xml_file].nil?
-    Fsinv.options[:xml_file] = File.join(Dir.home,
-      if Fsinv.options[:name].nil?
+if Fsinv::options[:xml]
+  if Fsinv::options[:xml_file].nil?
+    Fsinv::options[:xml_file] = File.join(Dir.home,
+      if Fsinv::options[:name].nil?
         "#{DEFAULT_NAME}.xml"
       else
-        "#{Fsinv.options[:name]}.xml"
+        "#{Fsinv::options[:name]}.xml"
       end
     )
   end
   
-  puts "writing XML to #{Fsinv.options[:xml_file]}" unless Fsinv.options[:silent]
+  puts "writing XML to #{Fsinv::options[:xml_file]}" unless Fsinv::options[:silent]
 
   #$progressbar = ProgressBar.new(inventory.file_structure.inject{ |arr,item| arr + item.item_count }, :bar, :counter)
   xml_data = Fsinv.inventory_to_xml(inventory)
   
   unless xml_data.nil?
     begin
-      file = File.open(Fsinv.options[:xml_file], 'w') 
+      file = File.open(Fsinv::options[:xml_file], 'w') 
       file.write(xml_data)
     rescue
       puts "error writing XML file"
@@ -409,8 +399,8 @@ if Fsinv.options[:xml]
   end
 end
 
-if Fsinv.options[:print]  
-  print_data = case Fsinv.options[:print_format] 
+if Fsinv::options[:print]  
+  print_data = case Fsinv::options[:print_format] 
                when :json then Fsinv.inventory_to_json(inventory)
                when :xml  then Fsinv.inventory_to_xml(inventory)
                when :yaml then Fsinv.inventory_to_yaml(inventory)
