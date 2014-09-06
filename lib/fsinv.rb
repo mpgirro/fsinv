@@ -31,7 +31,7 @@ end
 
 module Fsinv
   
-  VERSION = '0.1.2'
+  VERSION = '0.1.4'
   
   # Kibibyte, Mebibyte, Gibibyte, etc... all the IEC sizes
   BYTES_IN_KiB = 2**10
