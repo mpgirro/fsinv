@@ -105,7 +105,6 @@ module Fsinv
     return "#{bytes} B"
   end
 
-  #returns DirectoryDefinition object
   def parse(folder_path, reduced_scan = false)
   
     if IGNORE_FILES.include?(File.basename(folder_path))

@@ -6,7 +6,7 @@ require 'optparse'
 require 'fsinv'
 
 DEFAULT_NAME = "inventory"
-USAGE = "Usage: fsinv [options] basepath1 [basepath2 [basepath3 [...]]] "
+USAGE = "Usage: fsinv [options] basepath [basepath [...]]"
 
 Fsinv::options = {}
 OptionParser.new do |opts|
@@ -56,7 +56,7 @@ OptionParser.new do |opts|
   end
   #opts.separator ""
   
-  opts.on("--crc32", "Calculate CRC32 checksum for each file") do |crc|
+  opts.on("--crc32", "Calculate CRC32 checksum for files") do |crc|
     Fsinv::options[:crc32] = true
   end
   #opts.separator ""
@@ -73,7 +73,7 @@ OptionParser.new do |opts|
   end
   #opts.separator ""
   
-  opts.on("--md5", "Calculate MD5 hash for each file") do |md5|
+  opts.on("--md5", "Calculate MD5 hash for files") do |md5|
     Fsinv::options[:md5] = true
   end
   #opts.separator ""
