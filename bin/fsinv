@@ -113,7 +113,8 @@ OptionParser.new do |opts|
   #opts.separator ""
   
   opts.on_tail("--version", "Show version") do
-    puts ::Version.join('.')
+    puts "fsinv version #{Fsinv::VERSION}"
+    #puts ::Version.join('.')
     exit
   end
   
