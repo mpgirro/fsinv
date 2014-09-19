@@ -23,7 +23,6 @@ module Fsinv
         @val_map[@idcursor] = value
         return @idcursor
       end
-      
     end
     
     def empty?
