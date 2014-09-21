@@ -6,9 +6,9 @@ require 'fsinv'
 Gem::Specification.new do |spec|
   spec.name        = 'fsinv'
   spec.version     = Fsinv::VERSION
-  spec.date        = '2014-08-14'
+  spec.date        = '2014-09-21'
   spec.summary     = "file system inventory tool"
-  spec.description = "fsinv indexes file systems. It creates a complex inventory of one or more file system hierarchies and supports output formats like JSON, YAML, XML, binary (ruby marshall dump) and SQLite3 db (via active_record)."
+  spec.description = "fsinv indexes file systems. It creates a complex inventory of one or more file system hierarchies and supports various output formats like JSON, YAML, XML, binary (ruby marshall dump) and SQLite3 db (via active_record). There is support for OSX extended file attribute tags, md5 hash and crc32 checksums."
   spec.author      = "Maximilian Irro"
   spec.email       = 'max@disposia.org'
   spec.files       = `git ls-files -z`.split("\x0")
