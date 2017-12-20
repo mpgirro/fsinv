@@ -30,16 +30,16 @@ end
 
 
 module Fsinv
-  
+
   VERSION = '0.1.4'
-  
+
   # Kibibyte, Mebibyte, Gibibyte, etc... all the IEC sizes
   BYTES_IN_KiB = 2**10
   BYTES_IN_MiB = 2**20
   BYTES_IN_GiB = 2**30
   BYTES_IN_TiB = 2**40
 
-  # these define a KB as 1000 bits, according to the SI prefix 
+  # these define a KB as 1000 bits, according to the SI prefix
   BYTES_IN_KB = 10**3
   BYTES_IN_MB = 10**6
   BYTES_IN_GB = 10**9
@@ -58,29 +58,30 @@ module Fsinv
     '.abbu', # osx contact archive exports
     '.mode'  # SubEthaEdit and Coda modes
   ]
-  
+
   class << self
     attr_accessor :options, :fmagic, :mime_tab, :magic_tab, :osx_tab, :fshugo_tab
   end
-  
+
   Fsinv.options    = {}
   Fsinv.fmagic     = FileMagic.new unless /darwin/.match(RUBY_PLATFORM)
   Fsinv.magic_tab  = Fsinv::LookupTable.new
   Fsinv.mime_tab   = Fsinv::LookupTable.new
   Fsinv.osx_tab    = Fsinv::LookupTable.new
   Fsinv.fshugo_tab = Fsinv::LookupTable.new
-  
+
   begin
     require 'ffi-xattr'
     Fsinv.options[:xattr] = true
   rescue LoadError
-    puts "gem 'ffi-xattr' required. Install it using 'gem install ffi-xattr'"
+    puts "gem 'ffi-xattr' required for extended file attributes (xattr)."
+    puts "Install it using 'gem install ffi-xattr'"
     Fsinv.options[:xattr] = false
     #exit
   end
-  
+
   module_function # all following methods will be callable from outside the module
-  
+
   # tries to handle various encoding problems encounterd with path strings
   def sanitize_string(string)
     return string.encode("UTF-16BE", :invalid=>:replace, :undef => :replace, :replace=>"?")
@@ -96,7 +97,7 @@ module Fsinv
     return "%.1f KB" % (bytes.to_f / BYTES_IN_KB) if bytes > BYTES_IN_KB
     return "#{bytes} B"
   end
-  
+
   def pretty_IEC_bytes(bytes)
     return "%.1f TiB" % (bytes.to_f / BYTES_IN_TiB) if bytes > BYTES_IN_TiB
     return "%.1f GiB" % (bytes.to_f / BYTES_IN_GiB) if bytes > BYTES_IN_GiB
@@ -106,7 +107,7 @@ module Fsinv
   end
 
   def parse(folder_path, reduced_scan = false)
-  
+
     if IGNORE_FILES.include?(File.basename(folder_path))
       # do nothing
     elsif File.basename(folder_path)[0..1] == "._"
@@ -120,24 +121,24 @@ module Fsinv
     else
       puts "processing #{folder_path}/*" unless reduced_scan || Fsinv.options[:silent]
     end
-  
+
     curr_dir = Fsinv::DirectoryDescription.new(folder_path, reduced_scan)
-  
+
     #begin
-      Pathname.new(folder_path).children.each { |f| 
+      Pathname.new(folder_path).children.each { |f|
         file = f.to_s.encode("UTF-8")
         if IGNORE_FILES.include?(File.basename(file))
           # do nothing
-        elsif File.directory?(file) 
+        elsif File.directory?(file)
           sub_folder = parse(file, reduced_scan)
-          curr_dir.bytes += sub_folder.bytes 
+          curr_dir.bytes += sub_folder.bytes
           curr_dir.file_list << sub_folder unless reduced_scan
           curr_dir.item_count += 1 # count this directory as an item
           curr_dir.item_count += sub_folder.item_count unless reduced_scan
         else
           puts "processing #{file}" if Fsinv.options[:verbose] && !reduced_scan && Fsinv.options[:silent].nil?
           sub_file = Fsinv::FileDescription.new(file, reduced_scan)
-          curr_dir.bytes += sub_file.bytes 
+          curr_dir.bytes += sub_file.bytes
           curr_dir.file_list << sub_file unless reduced_scan
           curr_dir.item_count += 1 unless reduced_scan
         end
@@ -151,14 +152,14 @@ module Fsinv
 
 
   def filestructure_to_db(structitem)
-    
+
     h = {
       :path => structitem.path,
       :bytes => structitem.bytes,
       :ctime => structitem.ctime,
       :mtime => structitem.mtime
     }
-  
+
     case structitem
     when DirectoryDescription
       h[:entity_type] = "directory"
@@ -166,16 +167,16 @@ module Fsinv
       h[:item_count] = structitem.item_count
     when FileDescription
       h[:entity_type] = "file"
-      
+
       mime_descr = Fsinv.mime_tab.get_value(structitem.mimetype)
       mime_id = MimeType.where(:mimetype => mime_descr).ids.first
       h[:mimetype] = mime_id
-    
+
       magic_descr = Fsinv.magic_tab.get_value(structitem.magicdescr)
       magic_id = MagicDescription.where(:magicdescr => magic_descr).ids.first
       h[:magicdescr] = magic_id
     end
-  
+
     osx_tags = [] # will be array of db ids
     unless structitem.osx_tags.nil?
       structitem.osx_tags.each do |json_id|
@@ -184,7 +185,7 @@ module Fsinv
       end
     end
     h[:osx_tags] = osx_tags
-  
+
     fshugo_tags = [] # will be array of db ids
     unless structitem.fshugo_tags.nil?
       structitem.fshugo_tags.each do |json_id|
@@ -193,20 +194,20 @@ module Fsinv
       end
     end
     h[:fshugo_tags] = fshugo_tags
-  
+
     FileStructure.create(h)
-  
-    structitem.file_list.each { |child| filestructure_to_db(child) } if h[:entity_type] == "directory" 
-  
+
+    structitem.file_list.each { |child| filestructure_to_db(child) } if h[:entity_type] == "directory"
+
   end
 
 
   def inventory_to_json(inventory)
     json_data = nil
-    begin 
+    begin
       require 'json'
       json_data = JSON.parse(inventory.to_json(max_nesting: 100))
-      json_data = JSON.pretty_generate(json_data, :max_nesting => 100) 
+      json_data = JSON.pretty_generate(json_data, :max_nesting => 100)
     rescue LoadError
       puts "gem 'json' needed for JSON creation. Install using 'gem install json'"
     end
@@ -235,7 +236,7 @@ module Fsinv
         xml.mimetype(defobj.mimetype)
         xml.magicdescr(defobj.magicdescr)
       }
-    end 
+    end
   end
 
 
@@ -243,14 +244,14 @@ module Fsinv
     xml_data = nil
     begin
       require 'nokogiri'
-      builder = Nokogiri::XML::Builder.new do |xml| 
+      builder = Nokogiri::XML::Builder.new do |xml|
         xml.inventory{
           #output the file structure
           xml.file_structure{
             inventory.file_structure.each do |fstruct|
               filestructure_to_xml(xml, fstruct)
             end
-          } 
+          }
           #output the magic tab
           xml.magic_tab{
             inventory.magic_tab.val_map.each{ |id, val|
@@ -265,14 +266,14 @@ module Fsinv
                 xml.id(id)
                 xml.value(val)
           } } }
-          
+
           xml.osx_tab{
             inventory.osx_tab.val_map.each{ |id, val|
               xml.item{
                 xml.id(id)
                 xml.value(val)
           } } }
-          
+
           xml.fshugo_tab{
             inventory.fshugo_tab.val_map.each{ |id, val|
               xml.item{
@@ -292,7 +293,7 @@ module Fsinv
   def inventory_to_yaml(inventory)
     yml_data = nil
     begin
-      require 'yaml'  
+      require 'yaml'
       yml_data = YAML::dump(inventory)
     rescue LoadError
       puts "gem 'yaml' needed for YAML creation. Install using 'gem install yaml'"
@@ -300,6 +301,3 @@ module Fsinv
     return yml_data
   end
 end # Fsinv
-
-
-

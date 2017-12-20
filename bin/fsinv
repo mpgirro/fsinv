@@ -38,8 +38,8 @@ OptionParser.new do |opts|
   opts.separator ""
   opts.separator "Specific options:"
   opts.separator ""
-  
-  opts.on("-a", "--all", "Save in all formats to the default destinations.", 
+
+  opts.on("-a", "--all", "Save in all formats to the default destinations.",
                          "Equal to -b -j -q -x -y. Use -n to change the ",
                          "file names of all inventorys at once.") do |all_flag|
     Fsinv::options[:binary]  = true
@@ -49,21 +49,21 @@ OptionParser.new do |opts|
     Fsinv::options[:yaml]    = true
   end
   #opts.separator ""
-  
+
   opts.on("--binary [FILE]", "Dump inventory data in binary format. Default is ~/#{DEFAULT_NAME}.bin") do |binary_file|
     Fsinv::options[:binary] = true
     Fsinv::options[:binary_file] = binary_file
   end
   #opts.separator ""
-  
+
   opts.on("--crc32", "Calculate CRC32 checksum for files") do |crc|
     Fsinv::options[:crc32] = true
   end
   #opts.separator ""
-  
+
   opts.on("--db [FILE]", "Save inventory as SQLite database. Default is ~/#{DEFAULT_NAME}.db") do |sql_file|
     Fsinv::options[:db] = true
-    Fsinv::options[:db_file] = sql_file 
+    Fsinv::options[:db_file] = sql_file
   end
   #opts.separator ""
 
@@ -72,13 +72,13 @@ OptionParser.new do |opts|
     Fsinv::options[:json_file] = json_file
   end
   #opts.separator ""
-  
+
   opts.on("--md5", "Calculate MD5 hash for files") do |md5|
     Fsinv::options[:md5] = true
   end
   #opts.separator ""
 
-  opts.on("-n", "--name NAME", "Change outputfile name. Default is '#{DEFAULT_NAME}'.", 
+  opts.on("-n", "--name NAME", "Change outputfile name. Default is '#{DEFAULT_NAME}'.",
                                "Specific targets for file formats will overwrite this.") do |name|
     Fsinv::options[:name] = name
   end
@@ -99,10 +99,10 @@ OptionParser.new do |opts|
     Fsinv::options[:verbose] = v
   end
   #opts.separator ""
-  
+
   opts.on("--xml [FILE]", "Save inventory in XML file format. Default is ~/#{DEFAULT_NAME}.xml") do |xml_file|
     Fsinv::options[:xml] = true
-    Fsinv::options[:xml_file] = xml_file 
+    Fsinv::options[:xml_file] = xml_file
   end
   #opts.separator ""
 
@@ -111,24 +111,24 @@ OptionParser.new do |opts|
     Fsinv::options[:yaml_file] = yaml_file
   end
   #opts.separator ""
-  
+
   opts.on_tail("--version", "Show version") do
     puts "fsinv version #{Fsinv::VERSION}"
     #puts ::Version.join('.')
     exit
   end
-  
+
   opts.on_tail("-h", "--help", "Show this message") do
     puts opts
     exit
   end
-  
+
 end.parse! # do the parsing. do it now!
 
 #p Fsinv::options
 #p ARGV
 
-if ARGV[0].nil? 
+if ARGV[0].nil?
   puts "No basepath provided. At least one needed"
   puts USAGE
   exit
@@ -139,7 +139,7 @@ ARGV.each do |arg|
     puts "Not a directory: #{arg}"
     puts USAGE
     exit
-  end 
+  end
 end
 
 if Fsinv::options[:crc32]
@@ -152,7 +152,7 @@ if Fsinv::options[:crc32]
   end
 end
 
-if Fsinv::options[:md5] 
+if Fsinv::options[:md5]
   begin
     require 'digest/md5'
   rescue
@@ -191,17 +191,17 @@ unless (Fsinv::options[:binary] || Fsinv::options[:db] || Fsinv::options[:xml] |
     Fsinv::options[:json_file] = File.join(Dir.home,
       if Fsinv::options[:name].nil?
         "#{DEFAULT_NAME}.json"
-      else 
+      else
         "#{Fsinv::options[:name]}.json"
       end
     )
   end
-  
+
   puts "writing JSON to #{Fsinv::options[:json_file]}" unless Fsinv::options[:silent]
-  
+
   begin
     require 'json'
-    
+
     # monkey-patch for "JSON::NestingError: nesting is too deep"
     module JSON
       class << self
@@ -211,12 +211,12 @@ unless (Fsinv::options[:binary] || Fsinv::options[:db] || Fsinv::options[:xml] |
         end
       end
     end
-    
+
     json_data = Fsinv.inventory_to_json(inventory)
-    
+
     unless json_data.nil?
-      begin       
-        file = File.open(Fsinv::options[:json_file], 'w') 
+      begin
+        file = File.open(Fsinv::options[:json_file], 'w')
         file.write(json_data)
       rescue
         puts "error writing JSON file"
@@ -243,7 +243,7 @@ if Fsinv::options[:yaml]
   yaml_data = Fsinv.inventory_to_yaml(inventory)
   unless yaml_data.nil?
     begin
-      file = File.open(Fsinv::options[:yaml_file], 'w') 
+      file = File.open(Fsinv::options[:yaml_file], 'w')
       file.write(yaml_data)
     rescue
       puts "error writing YAML file"
@@ -265,7 +265,7 @@ if Fsinv::options[:binary]
   end
   puts "writing binary dump to #{Fsinv::options[:binary_file]}" unless Fsinv::options[:silent]
   begin
-    file = File.open(Fsinv::options[:binary_file], 'wb') 
+    file = File.open(Fsinv::options[:binary_file], 'wb')
     file.write(Marshal.dump(inventory))
   rescue
     puts "error writing binary dump file"
@@ -289,14 +289,14 @@ if Fsinv::options[:db]
   `rm #{Fsinv::options[:db_file]}` if File.exists?(Fsinv::options[:db_file])
 
   begin
-    
+
     require 'active_record'
 
     ActiveRecord::Base.establish_connection(
         :adapter => "sqlite3",
         :database  => Fsinv::options[:db_file]
     )
-    
+
     ActiveRecord::Schema.define do
 
       create_table :file_structures, force: true do |t|
@@ -332,7 +332,7 @@ if Fsinv::options[:db]
       end
 
     end
-    
+
     class MimeType < ActiveRecord::Base
       attr_accessor :mimetype
     end
@@ -340,15 +340,15 @@ if Fsinv::options[:db]
     class MagicDescription < ActiveRecord::Base
       attr_accessor :magicdescr
     end
-    
+
     class FshugoTag < ActiveRecord::Base
       attr_accessor :tag
     end
-    
+
     class OsxTag < ActiveRecord::Base
       attr_accessor :tag
     end
-    
+
     class FileStructure < ActiveRecord::Base
       attr_accessor :path, :bytes, :ctime, :mtime, :entity_type
       attr_accessor :file_count, :item_count # used if referencing a directory
@@ -356,16 +356,16 @@ if Fsinv::options[:db]
       attr_accessor :osx_tags, :fshugo_tags
 
       serialize :osx_tags,Array    # tags is text type, make it behave like an array
-      serialize :fshugo_tags,Array # tags is text type, make it behave like an array  
+      serialize :fshugo_tags,Array # tags is text type, make it behave like an array
     end
-    
+
     inventory.mime_tab.val_map.each { |id, val| MimeType.create(:mimetype => val) }
     inventory.magic_tab.val_map.each { |id, val| MagicDescription.create(:magicdescr => val) }
     inventory.fshugo_tab.val_map.each { |id, val| FshugoTag.create(:tag => val) }
     inventory.osx_tab.val_map.each { |id, val| OsxTag.create(:tag => val) }
     inventory.file_structure.each { |fstruct| Fsinv.filestructure_to_db(fstruct) }
-    
-  rescue SQLite3::Exception => e 
+
+  rescue SQLite3::Exception => e
       puts e
   rescue LoadError
     puts "gem 'active_record' needed for DB creation. Install using 'gem install active_record'"
@@ -382,15 +382,15 @@ if Fsinv::options[:xml]
       end
     )
   end
-  
+
   puts "writing XML to #{Fsinv::options[:xml_file]}" unless Fsinv::options[:silent]
 
   #$progressbar = ProgressBar.new(inventory.file_structure.inject{ |arr,item| arr + item.item_count }, :bar, :counter)
   xml_data = Fsinv.inventory_to_xml(inventory)
-  
+
   unless xml_data.nil?
     begin
-      file = File.open(Fsinv::options[:xml_file], 'w') 
+      file = File.open(Fsinv::options[:xml_file], 'w')
       file.write(xml_data)
     rescue
       puts "error writing XML file"
@@ -400,8 +400,8 @@ if Fsinv::options[:xml]
   end
 end
 
-if Fsinv::options[:print]  
-  print_data = case Fsinv::options[:print_format] 
+if Fsinv::options[:print]
+  print_data = case Fsinv::options[:print_format]
                when :json then Fsinv.inventory_to_json(inventory)
                when :xml  then Fsinv.inventory_to_xml(inventory)
                when :yaml then Fsinv.inventory_to_yaml(inventory)

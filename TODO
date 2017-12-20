@@ -1,0 +1,7 @@
+extend command line tool way more complex
+
+supported operations:
+
+fsinv <index|load|rebuild>
+
+index:  [basepath1 [basepath2 [basepath3]]] [options] 
